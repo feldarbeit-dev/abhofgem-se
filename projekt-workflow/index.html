@@ -1,0 +1,476 @@
+<title>HA-Projektverfolgung</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: SAP-Fiori-nahe Arbeitsliste. Oben Pipeline der 7 Schritte, darunter Liste + Detailpanel rechts, unten Anforderungen für die IT. */
+:root {
+  --bg: #f3f5f8;
+  --surface: #ffffff;
+  --surface-2: #f7f9fb;
+  --line: #dde3ea;
+  --fg: #1d2d3e;
+  --muted: #5b6b7d;
+  --accent: #0a6ed1;
+  --accent-soft: #e5f0fb;
+  --ok: #188918;
+  --ok-soft: #e7f4e7;
+  --warn: #c35500;
+  --warn-soft: #fdf0e4;
+  --bad: #bb0000;
+  --bad-soft: #fbe9e9;
+  --todo: #c4ccd6;
+  --font-ui: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "Consolas", monospace;
+  --radius: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12181f; --surface: #1b232c; --surface-2: #212b36; --line: #2f3b48;
+    --fg: #e6edf4; --muted: #9aa8b7; --accent: #4db1ff; --accent-soft: #15324c;
+    --ok: #5dc35d; --ok-soft: #173319; --warn: #f0a050; --warn-soft: #3a2614;
+    --bad: #ff6b6b; --bad-soft: #3d1a1a; --todo: #3d4a58; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12181f; --surface: #1b232c; --surface-2: #212b36; --line: #2f3b48;
+  --fg: #e6edf4; --muted: #9aa8b7; --accent: #4db1ff; --accent-soft: #15324c;
+  --ok: #5dc35d; --ok-soft: #173319; --warn: #f0a050; --warn-soft: #3a2614;
+  --bad: #ff6b6b; --bad-soft: #3d1a1a; --todo: #3d4a58; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 14px; line-height: 1.45; }
+.wrap { max-width: 1320px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 48px; display: grid; gap: 20px; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+h1 { font-size: 22px; font-weight: 600; }
+h2 { font-size: 16px; font-weight: 600; }
+h3 { font-size: 14px; font-weight: 600; }
+p { margin: 0; }
+.mono { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+button { font: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, .row:focus-visible, .stage:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Kopf */
+.head { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; }
+.head .sub { color: var(--muted); max-width: 70ch; margin-top: 4px; }
+.badge-demo { font-size: 12px; background: var(--warn-soft); color: var(--warn); border-radius: 999px; padding: 3px 10px; font-weight: 600; }
+.whoami { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.whoami select { font: inherit; padding: 4px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--fg); }
+
+/* Pipeline */
+.pipeline { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.stage { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; text-align: left; color: var(--fg); display: grid; gap: 4px; position: relative; }
+.stage[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.stage .n { font-family: var(--font-data); font-size: 12px; color: var(--muted); }
+.stage .t { font-weight: 600; font-size: 13px; line-height: 1.25; min-height: 2.5em; }
+.stage .count { font-family: var(--font-data); font-size: 22px; font-weight: 500; line-height: 1; }
+.stage .meta { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 12px; }
+.role { display: inline-block; font-size: 11px; font-weight: 600; border-radius: 3px; padding: 1px 6px; white-space: nowrap; }
+.role-NT { background: var(--accent-soft); color: var(--accent); }
+.role-PL { background: var(--ok-soft); color: var(--ok); }
+.role-CO { background: var(--warn-soft); color: var(--warn); }
+.paused-n { color: var(--warn); font-size: 12px; }
+@media (max-width: 900px) { .pipeline { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .pipeline { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Filter */
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.chip { border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 999px; padding: 5px 12px; font-size: 13px; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.chip .c { font-family: var(--font-data); opacity: .8; margin-left: 4px; }
+.search { margin-left: auto; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--fg); font: inherit; min-width: 0; width: 240px; max-width: 100%; }
+
+/* Hauptbereich */
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 20px; align-items: start; }
+@media (max-width: 1080px) { .main { grid-template-columns: minmax(0, 1fr); } }
+.list { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.list-head, .row { display: grid; grid-template-columns: 6px minmax(180px, 2.2fr) minmax(150px, 1.6fr) 170px 120px 90px; gap: 12px; align-items: center; padding-inline: 0 14px; }
+.list-head { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; padding-block: 10px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.row { padding-block: 10px; border-bottom: 1px solid var(--line); cursor: pointer; background: var(--surface); }
+.row:last-child { border-bottom: 0; }
+.row:hover { background: var(--surface-2); }
+.row[aria-selected="true"] { background: var(--accent-soft); }
+.stripe { align-self: stretch; margin-block: -10px; }
+.st-run { background: var(--ok); } .st-wait { background: var(--warn); } .st-late { background: var(--bad); } .st-done { background: var(--todo); }
+.nr { font-family: var(--font-data); color: var(--accent); font-size: 13px; }
+.desc { font-weight: 500; overflow-wrap: anywhere; }
+.small { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.steps { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 4px; }
+.steps i { height: 6px; border-radius: 1px; background: var(--todo); }
+.steps i.done { background: var(--ok); }
+.steps i.cur { background: var(--accent); }
+.steps i.cur.paused { background: var(--warn); }
+.age { font-family: var(--font-data); font-variant-numeric: tabular-nums; text-align: right; font-size: 13px; }
+.age.late { color: var(--bad); font-weight: 500; }
+.age.warn { color: var(--warn); }
+.empty { padding: 32px 16px; text-align: center; color: var(--muted); }
+@media (max-width: 760px) {
+  .list-head { display: none; }
+  .row { grid-template-columns: 6px minmax(0, 1fr) auto; grid-template-areas: "s a g" "s b b" "s c d"; row-gap: 6px; }
+  .row > :nth-child(1) { grid-area: s; } .row > :nth-child(2) { grid-area: a; } .row > :nth-child(3) { grid-area: b; }
+  .row > :nth-child(4) { grid-area: c; } .row > :nth-child(5) { grid-area: d; } .row > :nth-child(6) { grid-area: g; }
+}
+
+/* Detail */
+.detail { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
+.detail > section { padding: 16px; border-bottom: 1px solid var(--line); display: grid; gap: 10px; }
+.detail > section:last-child { border-bottom: 0; }
+.d-title { display: grid; gap: 2px; }
+.d-title .desc { font-size: 16px; font-weight: 600; }
+.kv { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 4px 10px; font-size: 13px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; overflow-wrap: anywhere; }
+.timeline { list-style: none; margin: 0; padding: 0; display: grid; }
+.timeline li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; position: relative; padding-bottom: 12px; }
+.timeline li:not(:last-child)::before { content: ""; position: absolute; left: 10px; top: 22px; bottom: 0; width: 2px; background: var(--line); }
+.timeline li.done:not(:last-child)::before { background: var(--ok); }
+.dot { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-data); font-size: 11px; font-weight: 500; border: 2px solid var(--todo); color: var(--muted); background: var(--surface); }
+.done .dot { background: var(--ok); border-color: var(--ok); color: var(--surface); }
+.cur .dot { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.cur.paused .dot { border-color: var(--warn); color: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
+.tl-body { display: grid; gap: 2px; }
+.tl-top { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tl-name { font-weight: 600; font-size: 13px; }
+.todo .tl-name { color: var(--muted); font-weight: 500; }
+.tl-who { font-size: 12px; color: var(--muted); }
+.cur .tl-who { color: var(--fg); }
+.pill { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; }
+.pill-run { background: var(--accent-soft); color: var(--accent); }
+.pill-wait { background: var(--warn-soft); color: var(--warn); }
+.pill-done { background: var(--ok-soft); color: var(--ok); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn { border: 1px solid var(--accent); background: var(--accent); color: var(--surface); border-radius: var(--radius); padding: 7px 12px; font-weight: 600; font-size: 13px; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn.warn { background: transparent; color: var(--warn); border-color: var(--warn); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.hint { font-size: 12px; color: var(--muted); }
+.reason { display: grid; gap: 6px; }
+textarea, .reason input { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--fg); width: 100%; resize: vertical; }
+.log { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 260px; overflow: auto; }
+.log li { font-size: 13px; display: grid; gap: 1px; }
+.log .when { font-family: var(--font-data); font-size: 11px; color: var(--muted); }
+.toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: var(--radius); font-size: 13px; max-width: calc(100% - 32px); box-shadow: 0 6px 24px rgba(0,0,0,.2); }
+
+/* IT-Teil */
+.spec { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; display: grid; gap: 18px; }
+.spec p, .spec li { max-width: 80ch; }
+.spec ul, .spec ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.spec-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px 28px; }
+.spec-grid > div { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: var(--surface-2); }
+td.mono { white-space: nowrap; }
+@media (prefers-reduced-motion: no-preference) { .row, .chip, .stage { transition: background-color .12s, border-color .12s; } }
+</style>
+
+<div class="wrap">
+  <header class="head">
+    <div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <h1>Hausanschluss-Projekte</h1>
+        <span class="badge-demo">Entwurf für die IT · Beispieldaten</span>
+      </div>
+      <p class="sub">Jedes Projekt durchläuft dieselben 7 Schritte. Wer einen Schritt abschließt, übergibt automatisch an die nächste Rolle. Alle Beteiligten sehen jederzeit, wo ein Projekt steht und bei wem es liegt.</p>
+    </div>
+    <label class="whoami" for="who">Angemeldet als
+      <select id="who">
+        <option value="NT">GRAFIJAK · Netztechniker</option>
+        <option value="PL">BITTEHUB · Projektleiter</option>
+        <option value="CO">GNIGLBER · Controlling</option>
+      </select>
+    </label>
+  </header>
+
+  <nav class="pipeline" id="pipeline" aria-label="Projekte je Schritt"></nav>
+
+  <div class="filters" id="filters">
+    <button class="chip" data-f="mine" aria-pressed="true">Meine Aufgaben<span class="c" id="c-mine"></span></button>
+    <button class="chip" data-f="all" aria-pressed="false">Alle offenen<span class="c" id="c-all"></span></button>
+    <button class="chip" data-f="late" aria-pressed="false">Überfällig &gt; 14 Tage<span class="c" id="c-late"></span></button>
+    <button class="chip" data-f="paused" aria-pressed="false">Zurückgestellt<span class="c" id="c-paused"></span></button>
+    <button class="chip" data-f="done" aria-pressed="false">Abgelegt<span class="c" id="c-done"></span></button>
+    <input class="search" id="q" type="search" placeholder="Meldung, Adresse, Kunde …" aria-label="Suchen">
+  </div>
+
+  <div class="main">
+    <div class="list" role="listbox" aria-label="Projekte" id="list"></div>
+    <aside class="detail" id="detail" aria-live="polite"></aside>
+  </div>
+
+  <section class="spec" id="it">
+    <div style="display:grid;gap:6px">
+      <span class="label">Für die IT</span>
+      <h2>Was sich gegenüber heute ändern soll</h2>
+      <p class="muted">Heute ist ein Projekt eine HA-Meldung mit drei Status (offen, zurückgestellt, in Arbeit). Die Meldung wird per Mail oder „Weiterleiten“ zwischen Netztechnik, Projektleitung und Controlling hin- und hergeschickt. Kommt sie nicht zurück, weiß niemand, wie weit sie ist. Ziel: ein fester Ablauf mit 7 Schritten direkt an der Meldung, sichtbar für alle Beteiligten.</p>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Schritt</th><th>Rolle</th><th>Erledigt, wenn …</th><th>Danach automatisch</th></tr></thead>
+        <tbody id="spec-steps"></tbody>
+      </table>
+    </div>
+
+    <div class="spec-grid">
+      <div>
+        <h3>Muss-Anforderungen</h3>
+        <ol>
+          <li>Jede HA-Meldung hat genau einen aktuellen Schritt (1–7) und eine zuständige Person.</li>
+          <li>Button „Schritt abschließen“: setzt den nächsten Schritt, trägt Datum und Benutzer ein und legt die Aufgabe bei der nächsten Rolle in den Eingang.</li>
+          <li>Button „Zurückgeben“ mit Pflichtgrund, z. B. Controlling an Projektleitung, wenn das Angebot falsch ist.</li>
+          <li>„Zurückstellen“ bleibt möglich, aber mit Grund und Wiedervorlagedatum.</li>
+          <li>Liste „Meine Aufgaben“ je Benutzer und Liste „Alle Projekte, an denen ich beteiligt bin“.</li>
+          <li>Anzeige „liegt seit X Tagen“ je Schritt, rot ab 14 Tagen.</li>
+          <li>Verlauf: wer hat welchen Schritt wann abgeschlossen, plus die bestehenden Kommentare.</li>
+        </ol>
+      </div>
+      <div>
+        <h3>Möglicher Weg in SAP (zur Prüfung)</h3>
+        <ul>
+          <li><strong>Anwenderstatusschema</strong> für die Meldungsart HA mit den 7 Schritten als Status, inkl. erlaubter Übergänge und Berechtigung je Rolle.</li>
+          <li><strong>Partnerrollen</strong> an der Meldung für Netztechniker, Projektleiter und Controlling, damit die Zuständigkeit je Schritt feststeht.</li>
+          <li><strong>Workflow</strong> (z. B. Flexible Workflow / Business Workflow), der beim Statuswechsel eine Aufgabe in „Meine Inbox“ der nächsten Rolle erzeugt.</li>
+          <li><strong>Erweiterung der bestehenden Fiori-App</strong> „Meldung“: Fortschrittsanzeige im Kopf, Schritt-Buttons in der Fußleiste, Filter „Meine Aufgaben“ in der Übersicht.</li>
+          <li>Zusatzdaten bleiben wie bisher (AV-Nummer, BKZ, Angebotsnummer).</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Offene Fragen</h3>
+        <ul>
+          <li>Braucht es zwischen Schritt 4 und 5 einen Wartestatus „Auftrag vom Kunden erhalten“?</li>
+          <li>Wer darf Schritte überspringen, z. B. Leistungsnachverrechnung ohne Zählermontage?</li>
+          <li>Vertretung bei Urlaub: Aufgabe an das Team (z. B. NT-S3 Team Gmunden) statt an eine Person?</li>
+          <li>Sollen Erinnerungen per Mail rausgehen, wenn ein Schritt länger als 14 Tage liegt?</li>
+        </ul>
+      </div>
+    </div>
+    <p class="hint">Dieser Entwurf zeigt nur Ablauf und Oberfläche. Die Daten sind Beispiele aus der aktuellen Übersicht, Schritte und Datumswerte sind teilweise angenommen. Klicks auf „Schritt abschließen“ usw. ändern nur die Vorschau im eigenen Browser.</p>
+  </section>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const TODAY = new Date(2026, 9, 12);
+const STEPS = [
+  { name: "Anlegen", role: "NT", done: "Meldung mit Art, Adresse und Beschreibung angelegt", next: "Weiter an Netztechnik (Schritt 2)" },
+  { name: "Anlagen & GP pflegen", role: "NT", done: "Geschäftspartner, Anschlussobjekt und Anlage vollständig", next: "Aufgabe an Projektleitung" },
+  { name: "Angebot erstellen", role: "PL", done: "BKZ angelegt, Angebot kalkuliert und als Anhang an der Meldung", next: "Aufgabe an Controlling" },
+  { name: "Angebot prüfen & verschicken", role: "CO", done: "Angebot geprüft und an den Kunden versendet", next: "Aufgabe an Netztechnik" },
+  { name: "Zählermontage", role: "NT", done: "Zähler montiert, Montagedatum eingetragen", next: "Aufgabe an Projektleitung" },
+  { name: "Verrechnen", role: "PL", done: "Rechnung erstellt", next: "Aufgabe an Controlling" },
+  { name: "Ablegen", role: "CO", done: "Unterlagen vollständig, Meldung abgeschlossen", next: "Projekt abgeschlossen" },
+];
+const ROLES = { NT: "Netztechniker", PL: "Projektleiter", CO: "Controlling" };
+const USERS = { NT: "GRAFIJAK", PL: "BITTEHUB", CO: "GNIGLBER" };
+
+const d = s => { const [a, b, c] = s.split("."); return new Date(+c, +b - 1, +a); };
+const fmt = dt => dt.toLocaleDateString("de-AT", { day: "2-digit", month: "2-digit", year: "numeric" });
+const days = dt => Math.round((TODAY - dt) / 864e5);
+
+// step = Index des aktuellen Schritts (0–6), 7 = abgelegt
+const RAW = [
+  ["300509727", "AA 4813 Münsterstraße 12 | Danzer", "Strom · Anschlussänderung", "Münsterstraße 12, 4813 Altmünster", "21.05.2026", 4, null, ["21.05.2026", "21.05.2026", "26.05.2026", "27.05.2026"],
+    [["21.05.2026", "GRAFIJAK", "Bitte Angebot von Freileitung auf Erdkabel"], ["26.05.2026", "BITTEHUB", "BKZ Fehler Kosten aktualisiert."], ["27.05.2026", "GNIGLBER", "Angebot 49612 an Kunden per Mail gesendet, siehe Anhang"]]],
+  ["300491120", "NV Stockham 7a | Huber Stefan", "Strom · Leistungsnachverrechnung", "Stockham 7a, 4663 Laakirchen", "10.03.2026", 1, null, ["10.03.2026"], []],
+  ["300476563", "NV 4810 Friedrich Hebbel-Straße 9", "Strom · Leistungsnachverrechnung", "Friedrich Hebbel-Straße 9, 4810 Gmunden", "15.12.2025", 5, null, ["15.12.2025", "18.12.2025", "14.01.2026", "20.01.2026", "02.09.2026"], []],
+  ["300472357", "Baustrom Anton Satori Straße | TIT", "Strom · Neuanschluss", "Anton von Satori-Straße 59, 4810 Gmunden", "25.11.2025", 4, null, ["25.11.2025", "27.11.2025", "09.12.2025", "11.12.2025"], []],
+  ["300423925", "NA Kaltenbrunner | Münsterstraße", "Strom · Neuanschluss", "Münsterstraße GNR, 4801 Altmünster", "10.04.2025", 6, null, ["10.04.2025", "15.04.2025", "05.05.2025", "08.05.2025", "11.08.2026", "28.09.2026"], []],
+  ["300513663", "Baustrom Brahmsstöckelweg 8", "Strom · Neuanschluss", "Brahmsstöckelweg 8", "08.06.2026", 2, "Warten auf Lageplan vom Kunden", ["08.06.2026", "15.06.2026"], []],
+  ["300456574", "Baustrom Münsterstraße | Lang Bau", "Strom · Neuanschluss", "Münsterstraße GNR, 4801 Altmünster", "17.09.2025", 4, "Zählerplatz auf der Baustelle noch nicht fertig", ["17.09.2025", "19.09.2025", "06.10.2025", "09.10.2025"], []],
+  ["300447576", "NA Linden 19 | Windischbauer", "Strom · Neuanschluss", "Linden 19, 4662 Laakirchen", "04.08.2025", 3, "Kunde klärt Variante Erdkabel", ["04.08.2025", "06.08.2025", "01.09.2025"], []],
+  ["300393103", "Lindach-Thal 2, 4663 | Neuhofer", "Strom · Neuanschluss", "Lindach-Thal 2, 4663 Laakirchen", "14.11.2024", 4, "Bau ruht über den Winter", ["14.11.2024", "18.11.2024", "10.12.2024", "12.12.2024"], []],
+  ["300521621", "Hildprechting 1260/2 KG 42112 Demir", "Strom · Neuanschluss", "Hildprechting GNR, 4694 Ohlsdorf", "06.07.2026", 2, null, ["06.07.2026", "20.07.2026"], []],
+  ["300497665", "NA 4813 Heckenweg GNR 36/2 | Petrisch", "Strom · Neuanschluss", "Heckenweg GNR, 4801 Altmünster", "03.04.2026", 3, null, ["03.04.2026", "07.04.2026", "08.10.2026"], []],
+  ["300488275", "AÄ Hildprechting 35 | Kofler", "Strom · Anschlussänderung", "Hildprechting 35, 4694 Ohlsdorf", "23.02.2026", 5, null, ["23.02.2026", "24.02.2026", "10.03.2026", "12.03.2026", "30.09.2026"], []],
+  ["300398412", "NA Traunsteinstraße 4 | Moser", "Strom · Neuanschluss", "Traunsteinstraße 4, 4810 Gmunden", "02.12.2024", 7, null, ["02.12.2024", "03.12.2024", "18.12.2024", "19.12.2024", "14.04.2026", "29.04.2026", "06.05.2026"], []],
+];
+
+let projects = RAW.map(([nr, desc, art, addr, created, step, paused, stepDates, comments]) => {
+  // stepDates[i] = Datum, an dem Schritt i begonnen hat; Abschluss von Schritt i = Beginn von i+1
+  const starts = stepDates.map(d);
+  const log = [];
+  starts.forEach((dt, i) => { if (i > 0) log.push({ when: dt, who: USERS[STEPS[i - 1].role], text: `Schritt ${i} „${STEPS[i - 1].name}“ abgeschlossen` }); });
+  comments.forEach(([w, who, text]) => log.push({ when: d(w), who, text }));
+  if (paused) log.push({ when: starts[starts.length - 1], who: step < 7 ? USERS[STEPS[step].role] : "", text: `Zurückgestellt: ${paused}` });
+  log.sort((a, b) => b.when - a.when);
+  return { nr, desc, art, addr, created: d(created), step, paused, starts, log };
+});
+
+const state = { filter: "mine", stage: null, q: "", sel: "300509727", me: "NT", form: null };
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+const since = p => p.starts[Math.min(p.step, p.starts.length - 1)] || p.created;
+const isOpen = p => p.step < 7;
+const isLate = p => isOpen(p) && !p.paused && days(since(p)) > 14;
+const status = p => !isOpen(p) ? "done" : p.paused ? "wait" : isLate(p) ? "late" : "run";
+
+function matches(p, f) {
+  if (f === "mine") return isOpen(p) && STEPS[p.step].role === state.me;
+  if (f === "all") return isOpen(p);
+  if (f === "late") return isLate(p);
+  if (f === "paused") return isOpen(p) && !!p.paused;
+  if (f === "done") return !isOpen(p);
+  return true;
+}
+
+function renderPipeline() {
+  $("pipeline").innerHTML = STEPS.map((s, i) => {
+    const here = projects.filter(p => p.step === i);
+    const paused = here.filter(p => p.paused).length;
+    return `<button class="stage" data-i="${i}" aria-pressed="${state.stage === i}">
+      <span class="n">Schritt ${i + 1}</span>
+      <span class="t">${s.name}</span>
+      <span class="meta"><span class="count">${here.length}</span><span class="role role-${s.role}">${ROLES[s.role]}</span></span>
+      <span class="paused-n">${paused ? paused + " zurückgestellt" : "&nbsp;"}</span>
+    </button>`;
+  }).join("");
+}
+
+function renderList() {
+  ["mine", "all", "late", "paused", "done"].forEach(f => $("c-" + f).textContent = projects.filter(p => matches(p, f)).length);
+  const q = state.q.toLowerCase();
+  const rows = projects
+    .filter(p => matches(p, state.filter))
+    .filter(p => state.stage === null || p.step === state.stage)
+    .filter(p => !q || (p.nr + p.desc + p.addr + p.art).toLowerCase().includes(q))
+    .sort((a, b) => since(a) - since(b));
+  const head = `<div class="list-head"><span></span><span>Meldung</span><span>Art · Adresse</span><span>Schritt</span><span>Liegt bei</span><span style="text-align:right">Seit</span></div>`;
+  if (!rows.length) { $("list").innerHTML = head + `<div class="empty">Keine Projekte in dieser Ansicht.</div>`; return; }
+  $("list").innerHTML = head + rows.map(p => {
+    const st = status(p), open = isOpen(p), age = days(since(p));
+    const bar = STEPS.map((_, i) => `<i class="${i < p.step ? "done" : i === p.step ? "cur" + (p.paused ? " paused" : "") : ""}"></i>`).join("");
+    const role = open ? STEPS[p.step].role : null;
+    return `<div class="row" role="option" tabindex="0" data-nr="${p.nr}" aria-selected="${p.nr === state.sel}">
+      <span class="stripe st-${st}"></span>
+      <div style="min-width:0"><div class="nr">${p.nr}</div><div class="desc">${esc(p.desc)}</div></div>
+      <div style="min-width:0"><div>${esc(p.art)}</div><div class="small">${esc(p.addr)}</div></div>
+      <div><div class="steps">${bar}</div><div class="small">${open ? `${p.step + 1}/7 · ${STEPS[p.step].name}` : "Abgelegt"}${p.paused ? " · zurückgestellt" : ""}</div></div>
+      <div>${open ? `<span class="role role-${role}">${ROLES[role]}</span><div class="small mono">${USERS[role]}</div>` : `<span class="small">–</span>`}</div>
+      <div class="age ${open && !p.paused ? (age > 14 ? "late" : age > 7 ? "warn" : "") : ""}">${open ? age + " T" : fmt(since(p))}</div>
+    </div>`;
+  }).join("");
+}
+
+function renderDetail() {
+  const p = projects.find(x => x.nr === state.sel);
+  if (!p) { $("detail").innerHTML = `<section><p class="muted">Projekt in der Liste auswählen, um Verlauf und Aktionen zu sehen.</p></section>`; return; }
+  const open = isOpen(p);
+  const cur = open ? STEPS[p.step] : null;
+  const mine = open && cur.role === state.me;
+  const tl = STEPS.map((s, i) => {
+    const cls = i < p.step ? "done" : i === p.step ? "cur" + (p.paused ? " paused" : "") : "todo";
+    let who;
+    if (i < p.step) who = `${USERS[s.role]} · erledigt ${fmt(p.starts[i + 1] || p.starts[i])}`;
+    else if (i === p.step) who = `${USERS[s.role]} · seit ${fmt(since(p))} (${days(since(p))} Tage)`;
+    else who = ROLES[s.role];
+    const pill = i === p.step ? (p.paused ? `<span class="pill pill-wait">Zurückgestellt</span>` : `<span class="pill pill-run">Aktuell</span>`) : "";
+    return `<li class="${cls}"><span class="dot">${i < p.step ? "✓" : i + 1}</span>
+      <div class="tl-body"><div class="tl-top"><span class="tl-name">${s.name}</span><span class="role role-${s.role}">${ROLES[s.role]}</span>${pill}</div>
+      <span class="tl-who mono">${who}</span>${i === p.step && p.paused ? `<span class="tl-who">Grund: ${esc(p.paused)}</span>` : ""}</div></li>`;
+  }).join("");
+
+  let actions = "";
+  if (!open) actions = `<p class="hint">Projekt ist abgelegt. Alle Schritte erledigt.</p>`;
+  else if (state.form) {
+    const lbl = state.form === "back" ? `Zurückgeben an ${ROLES[STEPS[p.step - 1].role]} – Grund` : "Zurückstellen – Grund";
+    actions = `<form class="reason" id="reason-form"><label class="label" for="reason">${lbl}</label>
+      <input id="reason" required placeholder="${state.form === "back" ? "z. B. BKZ fehlt im Angebot" : "z. B. Kunde meldet sich nach Bauverhandlung"}">
+      <div class="actions"><button class="btn" type="submit">Bestätigen</button><button class="btn ghost" type="button" data-act="cancel">Abbrechen</button></div></form>`;
+  } else if (p.paused) {
+    actions = `<div class="actions"><button class="btn" data-act="resume" ${mine ? "" : "disabled"}>Wieder aufnehmen</button></div>
+      <p class="hint">${mine ? "Setzt den Schritt fort, die Wartezeit läuft ab heute." : `Nur ${ROLES[cur.role]} kann den Schritt wieder aufnehmen.`}</p>`;
+  } else {
+    const nxt = p.step < 6 ? `${ROLES[STEPS[p.step + 1].role]} (${USERS[STEPS[p.step + 1].role]})` : "Archiv";
+    actions = `<div class="actions">
+        <button class="btn" data-act="next" ${mine ? "" : "disabled"}>Schritt abschließen</button>
+        ${p.step > 0 ? `<button class="btn ghost" data-act="back" ${mine ? "" : "disabled"}>Zurückgeben</button>` : ""}
+        <button class="btn warn" data-act="pause" ${mine ? "" : "disabled"}>Zurückstellen</button>
+      </div>
+      <p class="hint">${mine ? `Danach liegt das Projekt bei: <strong>${nxt}</strong>. Die Aufgabe erscheint dort automatisch.` : `Dieser Schritt liegt bei ${ROLES[cur.role]} (${USERS[cur.role]}). Du siehst den Stand, kannst aber nichts abschließen.`}</p>`;
+  }
+
+  $("detail").innerHTML = `
+    <section>
+      <div class="d-title"><span class="nr">${p.nr}</span><span class="desc">${esc(p.desc)}</span></div>
+      <dl class="kv"><dt>Art</dt><dd>HA · ${esc(p.art)}</dd><dt>Adresse</dt><dd>${esc(p.addr)}</dd><dt>Angelegt</dt><dd class="mono">${fmt(p.created)} · ${USERS.NT}</dd>
+      <dt>Team</dt><dd>NT-S3 Team Gmunden</dd></dl>
+    </section>
+    <section><span class="label">Ablauf</span><ol class="timeline">${tl}</ol></section>
+    <section><span class="label">Nächste Aktion</span>${actions}</section>
+    <section><span class="label">Verlauf &amp; Kommentare</span>
+      <form id="cmt-form" class="reason"><textarea id="cmt" rows="2" placeholder="Kommentar für alle Beteiligten …"></textarea>
+      <div class="actions"><button class="btn ghost" type="submit">Kommentar speichern</button></div></form>
+      <ul class="log">${p.log.map(l => `<li><span class="when">${fmt(l.when)} · ${esc(l.who)}</span><span>${esc(l.text)}</span></li>`).join("")}</ul>
+    </section>`;
+}
+
+function renderSpec() {
+  $("spec-steps").innerHTML = STEPS.map((s, i) => `<tr><td class="mono">${i + 1} · ${s.name}</td><td><span class="role role-${s.role}">${ROLES[s.role]}</span></td><td>${s.done}</td><td>${s.next}</td></tr>`).join("");
+}
+
+function render() { renderPipeline(); renderList(); renderDetail(); }
+
+let toastT;
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200); }
+
+function act(kind, reason) {
+  const p = projects.find(x => x.nr === state.sel);
+  const me = USERS[state.me];
+  if (kind === "next") {
+    p.log.unshift({ when: TODAY, who: me, text: `Schritt ${p.step + 1} „${STEPS[p.step].name}“ abgeschlossen` });
+    p.step++; p.starts[p.step] = TODAY;
+    toast(p.step < 7 ? `Übergeben an ${ROLES[STEPS[p.step].role]} (${USERS[STEPS[p.step].role]})` : "Projekt abgelegt");
+  } else if (kind === "back") {
+    p.log.unshift({ when: TODAY, who: me, text: `Zurückgegeben an Schritt ${p.step}: ${reason}` });
+    p.step--; p.starts[p.step] = TODAY; p.starts.length = p.step + 1;
+    toast(`Zurück an ${ROLES[STEPS[p.step].role]} (${USERS[STEPS[p.step].role]})`);
+  } else if (kind === "pause") {
+    p.paused = reason; p.log.unshift({ when: TODAY, who: me, text: `Zurückgestellt: ${reason}` });
+    toast("Projekt zurückgestellt");
+  } else if (kind === "resume") {
+    p.paused = null; p.starts[p.step] = TODAY; p.log.unshift({ when: TODAY, who: me, text: "Wieder aufgenommen" });
+    toast("Projekt wieder aufgenommen");
+  }
+  state.form = null; render();
+}
+
+$("pipeline").addEventListener("click", e => {
+  const b = e.target.closest(".stage"); if (!b) return;
+  const i = +b.dataset.i; state.stage = state.stage === i ? null : i;
+  if (state.stage !== null && state.filter === "mine") setFilter("all"); else render();
+});
+function setFilter(f) {
+  state.filter = f;
+  document.querySelectorAll("#filters .chip").forEach(c => c.setAttribute("aria-pressed", c.dataset.f === f));
+  render();
+}
+$("filters").addEventListener("click", e => { const c = e.target.closest(".chip"); if (c) setFilter(c.dataset.f); });
+$("q").addEventListener("input", e => { state.q = e.target.value; renderList(); });
+$("who").addEventListener("change", e => { state.me = e.target.value; state.form = null; render(); });
+function pick(row) { state.sel = row.dataset.nr; state.form = null; renderList(); renderDetail(); }
+$("list").addEventListener("click", e => { const r = e.target.closest(".row"); if (r) pick(r); });
+$("list").addEventListener("keydown", e => { const r = e.target.closest(".row"); if (r && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); pick(r); } });
+$("detail").addEventListener("click", e => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const a = b.dataset.act;
+  if (a === "next" || a === "resume") act(a);
+  else if (a === "back" || a === "pause") { state.form = a; renderDetail(); $("reason").focus(); }
+  else if (a === "cancel") { state.form = null; renderDetail(); }
+});
+$("detail").addEventListener("submit", e => {
+  e.preventDefault();
+  if (e.target.id === "reason-form") { const v = $("reason").value.trim(); if (v) act(state.form, v); }
+  if (e.target.id === "cmt-form") {
+    const v = $("cmt").value.trim(); if (!v) return;
+    projects.find(x => x.nr === state.sel).log.unshift({ when: TODAY, who: USERS[state.me], text: v });
+    renderDetail(); toast("Kommentar gespeichert");
+  }
+});
+
+renderSpec(); render();
+</script>
