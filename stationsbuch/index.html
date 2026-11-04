@@ -459,8 +459,7 @@ async function offerFile(filename, text, mime) {
 function template(st) {
   const g = [];
   g.push({ k: "bau", icon: "house", t: "Baulicher Teil", items: ["Mauerwerk / Box", "Dach", "Türen & Schlösser", "Lüftungsgitter", "Fundament & Umgebung", "Warn- & Hinweisschilder"] });
-  g.push({ k: "ms", icon: "bars", t: `MS-Anlage${st.ms ? " (" + st.ms + ")" : ""}`, items: ["Allgemeinzustand & Sauberkeit", "SF6-Druckanzeige", "Schaltgeräte & Antriebe", "Kurzschlussanzeiger", "Kabelendverschlüsse", "Spannungsprüfsystem"] });
-  (st.abgaenge || []).forEach((a) => g.push({ k: "lab-" + slug(a), icon: "line", t: `Leitungsabgang ${a}`, items: ["Lasttrennschalter", "Kabelendverschluss", "Beschriftung"] }));
+  g.push({ k: "ms", icon: "bars", t: `MS-Anlage${st.ms ? " (" + st.ms + ")" : ""}`, items: ["Allgemeinzustand & Sauberkeit", "SF6-Druckanzeige", "Schaltgeräte & Antriebe", "Leitungsabgänge (Zustand & Beschriftung)", "Kurzschlussanzeiger", "Kabelendverschlüsse", "Spannungsprüfsystem"] });
   g.push({ k: "trab", icon: "line", t: "Trafo-Abgang", items: ["HH-Sicherungen", "Lasttrennschalter", "Beschriftung"] });
   g.push({ k: "tr", icon: "coil", t: `MS/NS-Transformator${st.trafoInv ? " (Inv. " + st.trafoInv + ")" : ""}`, items: ["Ölstand & Dichtheit", "Luftentfeuchter / Silikagel", "Thermometer & Schleppzeiger", "Erdung", "Geräusche / Vibration", "Ölauffangwanne"] });
   g.push({ k: "ns", icon: "bars", t: "NS-Anlage", items: ["NH-Sicherungsleisten", "Sicherungseinsätze & Reserve", "Beschriftung der Abgänge", "Berührungsschutz", "PEN / Erdung"] });
@@ -856,9 +855,6 @@ function tabDaten(st) {
       <label class="field"><span>Stufe</span><input id="sd-stufe" type="text" data-bind="stDraft.stufe" value="${esc(d.stufe || "")}" ${ro}></label>
       <label class="field"><span>MS-Anlage</span><input id="sd-ms" type="text" data-bind="stDraft.ms" value="${esc(d.ms || "")}" placeholder="z. B. 36 kV" ${ro}></label>
     </div>
-    <div class="field"><span>Leitungsabgänge (MS) – je Abgang ein eigener Prüfbereich</span>
-      <div style="display:grid;gap:6px">${(d.abgaenge || []).map((a, i) => `<div class="row-flex" style="flex-wrap:nowrap"><input id="sd-ab-${i}" type="text" value="${esc(a)}" data-bind="stDraft.abgaenge.${i}" ${ro}>${ro ? "" : `<button type="button" class="btn ghost" data-act="ab-del" data-i="${i}" aria-label="Abgang entfernen">${ic("x")}</button>`}</div>`).join("")}
-      ${ro ? "" : `<button type="button" class="btn sm" style="justify-self:start" data-act="ab-add">${ic("plus", "sm")}Abgang</button>`}</div></div>
     <label class="check"><input id="sd-dk" type="checkbox" data-bind="stDraft.dk" ${d.dk ? "checked" : ""} ${ro}>Datenkonzentrator vorhanden</label>
     <label class="field"><span>Koordinaten für Navigation (optional)</span><input id="sd-gps" type="text" data-bind="stDraft.gps" value="${esc(d.gps || "")}" placeholder="48.0123, 13.7890" ${ro}></label>
     <label class="field"><span>Hinweise (Schlüssel, Zufahrt …)</span><textarea id="sd-notiz" data-bind="stDraft.notiz" ${ro}>${esc(d.notiz || "")}</textarea></label>
@@ -993,8 +989,6 @@ document.addEventListener("click", async (ev) => {
     case "exp-html": if (curIns) exportInspHTML(st, curIns); break;
     case "exp-all": exportAllCSV(); break;
     case "new-station": S.ui.newStation = { name: "" }; renderOverlay(); break;
-    case "ab-add": S.ui.stDraft.abgaenge = [...(S.ui.stDraft.abgaenge || []), ""]; render(); setTimeout(() => { const i = document.getElementById("sd-ab-" + (S.ui.stDraft.abgaenge.length - 1)); if (i) i.focus(); }, 40); break;
-    case "ab-del": S.ui.stDraft.abgaenge.splice(Number(el.dataset.i), 1); render(); break;
     case "st-del": S.ui.confirmDel = true; render(); break;
     case "st-del-no": S.ui.confirmDel = false; render(); break;
     case "st-del-yes": {
@@ -1060,7 +1054,7 @@ document.addEventListener("submit", (ev) => {
     S.ui.logOpen = false; toast("Eingetragen – danke!");
   } else if (f === "station") {
     const d = S.ui.stDraft; if (!d.name.trim()) return;
-    d.name = d.name.trim(); d.abgaenge = (d.abgaenge || []).map((a) => a.trim()).filter(Boolean);
+    d.name = d.name.trim();
     put("stations", d.id, clone(d)); S.ui.stDraft = null; toast("Stammdaten gespeichert");
   } else if (f === "newstation") {
     const name = S.ui.newStation.name.trim().toUpperCase(); if (!name) return;
