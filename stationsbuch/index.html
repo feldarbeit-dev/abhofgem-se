@@ -234,6 +234,10 @@ td.num, th.num { text-align: right; font-family: var(--font-data); font-variant-
 .repair td .chip { font-size: 12px; }
 tr.done td { color: var(--muted); }
 tr.done td .what { text-decoration: line-through; }
+table.anl td:first-child + td { min-width: 170px; }
+table.anl td.mono, table.anl td.num { white-space: nowrap; }
+table.anl .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+table.anl .tags .chip { font-size: 12px; padding: 1px 8px; }
 .skel { display: block; height: 12px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); }
 .empty { padding: 28px 16px; text-align: center; display: grid; gap: 10px; justify-items: center; color: var(--muted); }
 .empty .icon { width: 38px; height: 38px; stroke-width: 1.3; }
@@ -339,14 +343,14 @@ const ls = {
 /* ---------- Zustand ---------- */
 const S = {
   mode: "loading", // loading | db | local
-  data: { stations: {}, log: {}, photos: {}, inspections: {} },
+  data: { stations: {}, log: {}, photos: {}, inspections: {}, anlagen: {} },
   db: null, assets: null, downloads: null, user: null, myName: "",
   localPhotoURL: {},
   readOnly: false,
   view: { name: "list", sid: null, tab: "buch", folder: null, year: YEAR },
   ui: { q: "", filter: "alle", logOpen: false, draft: null, mfilter: "offen", confirmDel: false, stDraft: null, newStation: null, lightbox: null, open: {} },
 };
-const COLS = ["stations", "log", "photos", "inspections"];
+const COLS = ["stations", "log", "photos", "inspections", "anlagen"];
 
 /* ---------- Speicher ---------- */
 const LS_KEY = "stationsbuch.v1";
@@ -858,31 +862,56 @@ function tabAnlagen(st) {
     S.anl[st.id] = null;
     fetchAnlagen(st).then((r) => { if (r) { S.anl[st.id] = r; render(); } }).catch(() => {});
   }
-  const data = S.anl[st.id];
+  // Quelle: zuerst die SAP-API, sonst ein Testimport in der Datenbank (Sammlung "anlagen", Dokument = Stations-ID)
+  const imp = S.data.anlagen && S.data.anlagen[st.id];
+  const data = S.anl[st.id] || (imp && imp.straenge) || null;
+  const source = S.anl[st.id] ? "api" : imp ? "test" : null;
   const skel = (w) => `<span class="skel" style="width:${w}"></span>`;
-  const head = `<thead><tr><th>Anlage</th><th>Zählernummer</th><th>Adresse</th><th class="num">Letzter Stand</th><th>Ablesedatum</th></tr></thead>`;
-  const strangHTML = (name, count, rows, key, openDefault) => {
+  const strangName = (s) => s.includes("-") ? `Strang ${s.split("-").pop()}` : "Station (Betriebsmessung)";
+  const strangHTML = (name, code, sub, right, table, key, openDefault) => {
     const open = S.ui.open[key] ?? openDefault;
     return `<details class="card group" data-k="${esc(key)}" ${open ? "open" : ""}>
-      <summary><span class="gicon">${ic("line")}</span><span style="min-width:0"><span class="gt">${esc(name)}</span><br><span class="gs">${count}</span></span><span class="gright">${ic("chevron")}</span></summary>
-      <div class="tbl-wrap" style="border-top:1px solid var(--line)"><table>${head}<tbody>${rows}</tbody></table></div>
+      <summary><span class="gicon">${ic("line")}</span><span style="min-width:0"><span class="gt">${esc(name)}</span>${code ? ` <span class="mono muted" style="font-size:13px">${esc(code)}</span>` : ""}<br><span class="gs">${sub}</span></span><span class="gright">${right}${ic("chevron")}</span></summary>
+      <div class="tbl-wrap" style="border-top:1px solid var(--line)">${table}</div>
     </details>`;
   };
-  let body;
+  let body, hits = 0;
   if (Array.isArray(data) && data.length) {
-    body = data.map((s, i) => strangHTML(s.strang, `${(s.anlagen || []).length} Anlagen`,
-      (s.anlagen || []).map((a) => `<tr><td>${esc(a.anlage)}</td><td class="mono">${esc(a.zaehler)}</td><td>${esc(a.adresse || "")}</td><td class="num">${esc(a.stand ?? "–")}${a.einheit ? " " + esc(a.einheit) : ""}</td><td>${fmtDate(a.datum)}</td></tr>`).join(""),
-      "anl:" + st.id + ":" + i, i === 0)).join("");
+    const q = (S.ui.aq || "").trim().toLowerCase();
+    const match = (a) => !q || [a.adr, a.zusatz, a.anlage, a.zaehler, a.art].join(" ").toLowerCase().includes(q);
+    body = data.map((s, i) => {
+      const all = s.anlagen || []; const list = all.filter(match); hits += list.length;
+      if (q && !list.length) return "";
+      const nPV = all.filter((a) => a.anlart === "PV").length;
+      const nV = all.filter((a) => a.verst === 1).length;
+      const rows = list.map((a) => {
+        const tags = [
+          a.verst === 1 ? `<span class="chip bad">Muss verständigt werden</span>` : "",
+          a.anlart === "PV" ? `<span class="chip brand">PV${a.pv ? " " + String(a.pv).replace(".", ",") + " kWp" : ""}</span>` : "",
+          a.anschluss === "Freileitung" ? `<span class="chip">Freileitung</span>` : a.anschluss === "Bauprovisorium" ? `<span class="chip warn">Bauprovisorium</span>` : "",
+          a.ami === false ? `<span class="chip">Smart Meter offline</span>` : "",
+          a.ausgezogen ? `<span class="chip">ausgezogen</span>` : "",
+        ].join("");
+        return `<tr><td class="num">${esc(a.gang || "")}</td><td><b>${esc(a.adr || "")}</b>${a.zusatz ? `<br><span class="muted" style="font-size:13px">${esc(a.zusatz)}</span>` : ""}${tags ? `<span class="tags">${tags}</span>` : ""}</td><td>${esc(a.art || a.anlart || "")}</td><td class="mono">${esc(a.anlage || "")}</td><td class="mono">${esc(a.zaehler || "–")}</td><td class="num">${a.sich ? esc(a.sich) + " A" : "–"}</td></tr>`;
+      }).join("");
+      const table = `<table class="anl"><thead><tr><th class="num">Gang</th><th>Adresse</th><th>Art</th><th>Anlage</th><th>Zähler</th><th class="num">Sich.</th></tr></thead><tbody>${rows}</tbody></table>`;
+      const sub = `${all.length} Anlagen${nPV ? ` · ${nPV} PV` : ""}${q ? ` · ${list.length} Treffer` : ""}`;
+      const right = nV ? `<span class="chip bad">${nV} verständigen</span>` : "";
+      return strangHTML(strangName(s.strang), s.strang, sub, right, table, "anl:" + st.id + ":" + s.strang + (q ? ":q" : ""), !!q);
+    }).join("");
+    if (q && !hits) body = `<div class="card empty">${ic("search")}<b>Nichts gefunden</b><span>Keine Anlage passt zu „${esc(S.ui.aq)}“.</span></div>`;
   } else {
-    const sk = (n) => Array.from({ length: n }, (_, i) => `<tr><td>${skel("80%")}</td><td>${skel("90%")}</td><td>${skel(["70%", "55%", "85%"][i % 3])}</td><td class="num">${skel("60%")}</td><td>${skel("70%")}</td></tr>`).join("");
-    body = [["Strang 1", 3], ["Strang 2", 2], ["Strang 3", 4]].map(([n, c], i) => strangHTML(n, "Anlagen folgen aus SAP", sk(c), "anl:preview:" + i, i === 0)).join("");
+    const sk = (n) => `<table><thead><tr><th>Gang</th><th>Adresse</th><th>Art</th><th>Anlage</th><th>Zähler</th></tr></thead><tbody>${Array.from({ length: n }, (_, i) => `<tr><td>${skel("50%")}</td><td>${skel(["70%", "55%", "85%"][i % 3])}</td><td>${skel("80%")}</td><td>${skel("90%")}</td><td>${skel("70%")}</td></tr>`).join("")}</tbody></table>`;
+    body = [["Strang 1", 3], ["Strang 2", 2], ["Strang 3", 4]].map(([n, c], i) => strangHTML(n, "", "Anlagen folgen aus SAP", "", sk(c), "anl:preview:" + i, i === 0)).join("");
   }
+  const chip = source === "api" ? `<span class="chip ok">aus SAP</span>` : source === "test" ? `<span class="chip warn">Testanzeige</span>` : `<span class="chip warn">In Vorbereitung</span>`;
+  const total = data ? data.reduce((n, s) => n + (s.anlagen || []).length, 0) : 0;
   return `<section class="card pad" style="display:grid;gap:12px">
-    <div class="row-flex"><span class="gicon">${ic("meter")}</span><h2 style="font-family:var(--font-display);font-size:22px">Anlagen je Strang</h2>${data ? `<span class="chip ok">aus SAP</span>` : `<span class="chip warn">In Vorbereitung</span>`}</div>
-    <p class="muted" style="max-width:65ch">Die Stränge dieser Station mit den angeschlossenen Anlagen und Zählerdaten werden künftig über eine Schnittstelle direkt aus SAP angezeigt. Strang antippen zum Aufklappen.</p>
+    <div class="row-flex"><span class="gicon">${ic("meter")}</span><h2 style="font-family:var(--font-display);font-size:22px">Anlagen je Strang</h2>${chip}</div>
+    <p class="muted" style="max-width:65ch">${source === "test" ? `${esc(imp.quelle || "Testimport")}. ${data.length} Stränge, ${total} Anlagen. Später kommen die Daten direkt über die SAP-Schnittstelle.` : "Die Stränge dieser Station mit den angeschlossenen Anlagen und Zählerdaten werden künftig über eine Schnittstelle direkt aus SAP angezeigt."} Strang antippen zum Aufklappen.</p>
     <div class="row-flex"><span class="label">SAP-Zuordnung</span>${st.sap ? `<span class="chip brand mono">${esc(st.sap)}</span>` : `<span class="chip">noch nicht hinterlegt</span>${S.readOnly ? "" : `<button class="btn ghost sm" data-act="tab" data-v="daten">In Stammdaten eintragen</button>`}`}</div>
   </section>
-  ${data ? "" : `<p class="label">Vorschau – so wird es aussehen</p>`}
+  ${data ? `<label class="toolbar"><span class="search" style="position:relative;flex:1 1 220px">${ic("search")}<input id="aq" type="search" placeholder="Hausnummer, Anlage oder Zähler suchen" value="${esc(S.ui.aq || "")}" data-bind="aq" aria-label="Anlagen durchsuchen"></span></label>` : `<p class="label">Vorschau – so wird es aussehen</p>`}
   <section class="groups">${body}</section>`;
 }
 
@@ -1080,7 +1109,7 @@ document.addEventListener("change", async (ev) => {
 
 document.addEventListener("input", (ev) => {
   const t = ev.target;
-  if (t.dataset.bind && t.type !== "checkbox") { setPath(S.ui, t.dataset.bind, t.value); if (t.dataset.bind === "q") render(); return; }
+  if (t.dataset.bind && t.type !== "checkbox") { setPath(S.ui, t.dataset.bind, t.value); if (t.dataset.bind === "q" || t.dataset.bind === "aq") render(); return; }
   const st = S.data.stations[S.view.sid]; const ins = st && inspFor(st.id, S.view.year);
   if (t.dataset.mess && ins) {
     ins.mess = ins.mess || {};
@@ -1128,7 +1157,7 @@ function demoImage(kind) {
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 }
 function seedDemo() {
-  const d = { stations: baseStations(), log: {}, photos: {}, inspections: {} };
+  const d = { stations: baseStations(), log: {}, photos: {}, inspections: {}, anlagen: {} };
   const L = (sid, datum, von, bis, name, firma, grund, text, ok = true) => { const id = uid() + Object.keys(d.log).length; d.log[id] = { id, sid, datum, von, bis, name, firma, grund, text, ok, ts: datum }; };
   L("aurachkirchen", "2026-05-20", "08:10", "09:05", "Max Beispiel", "Netzbetrieb (Beispiel)", "Messung / Ablesung", "Amperemeter abgelesen, Schleppzeiger zurückgesetzt.");
   L("aurachkirchen", "2026-09-14", "13:30", "14:20", "Anna Muster", "Netzbetrieb (Beispiel)", "Störung", "NS-Abgang 4 Sicherung 160 A getauscht.");
@@ -1154,7 +1183,7 @@ function seedDemo() {
   return d;
 }
 function clearDemo() {
-  S.data = { stations: baseStations(), log: {}, photos: {}, inspections: {} };
+  S.data = { stations: baseStations(), log: {}, photos: {}, inspections: {}, anlagen: {} };
   S.demo = false; ls.set("sb.demo", false); persistLocal(); toast("Beispiele gelöscht – die Stationen bleiben"); go({ name: "list" });
 }
 
@@ -1162,7 +1191,7 @@ function clearDemo() {
 async function startLocal() {
   S.mode = "local";
   const saved = ls.get(LS_KEY);
-  if (saved && saved.stations) { S.data = Object.assign({ stations: {}, log: {}, photos: {}, inspections: {} }, saved); S.demo = ls.get("sb.demo") !== false && Object.values(S.data.photos).some((p) => p.demo); }
+  if (saved && saved.stations) { S.data = Object.assign({ stations: {}, log: {}, photos: {}, inspections: {}, anlagen: {} }, saved); S.demo = ls.get("sb.demo") !== false && Object.values(S.data.photos).some((p) => p.demo); }
   else { S.data = seedDemo(); S.demo = true; ls.set("sb.demo", true); persistLocal(); }
   try { const blobs = await idb.all(); for (const [k, b] of Object.entries(blobs)) S.localPhotoURL[k] = URL.createObjectURL(b); } catch {}
   fromHash(); render();
