@@ -191,6 +191,9 @@ textarea { min-height: 76px; resize: vertical; }
 .group { overflow: hidden; }
 .group > summary { list-style: none; display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; align-items: center; padding: 12px 14px; cursor: pointer; }
 .group > summary::-webkit-details-marker { display: none; }
+.gright { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.btn.okall { color: var(--ok); border-color: var(--ok); background: var(--ok-soft); white-space: nowrap; }
+.btn.okall:hover { background: var(--ok); color: #fff; }
 .gicon { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand); }
 .gt { font-weight: 700; overflow-wrap: anywhere; }
 .gs { font-size: 13px; color: var(--muted); }
@@ -763,7 +766,7 @@ function tabInsp(st) {
     const open = S.ui.open[k] ?? (a < items.length && !ro);
     return `<details class="card group" data-k="${esc(k)}" ${open ? "open" : ""}>
       <summary><span class="gicon">${ic(g.icon)}</span><span style="min-width:0"><span class="gt">${esc(g.t)}</span><br><span class="gs">${a}/${items.length} geprüft</span></span>
-      <span>${m ? `<span class="chip bad">${m} Mangel${m > 1 ? "" : ""}</span>` : a === items.length ? `<span class="chip ok">${ic("check", "sm")}i. O.</span>` : ""}</span></summary>
+      <span class="gright">${m ? `<span class="chip bad">${m} Mangel</span>` : a === items.length ? `<span class="chip ok">${ic("check", "sm")}i. O.</span>` : ""}${!ro && a < items.length ? `<button type="button" class="btn sm okall" data-act="group-ok" data-g="${esc(g.k)}" title="Alle noch nicht bewerteten Punkte als in Ordnung markieren">${ic("check", "sm")}${a ? "Rest i. O." : "Alle i. O."}</button>` : ""}</span></summary>
       ${items.map((it) => itemHTML(st, ins, it, ro)).join("")}
     </details>`;
   }).join("");
@@ -965,6 +968,22 @@ document.addEventListener("click", async (ev) => {
       ins.results[el.dataset.k] = r;
       put("inspections", ins.id, ins);
       if (r.s === "m") setTimeout(() => { const n = document.getElementById("nt-" + slug(el.dataset.k)); if (n) n.focus(); }, 60);
+      break;
+    }
+    case "group-ok": {
+      ev.preventDefault();
+      const ins = curIns; if (!ins) break;
+      ins.results = ins.results || {};
+      const g = template(st).find((x) => x.k === el.dataset.g); if (!g) break;
+      let n = 0, hasM = false;
+      for (const it of g.items) {
+        const r = ins.results[it.key];
+        if (r && r.s === "m") hasM = true;
+        if (!r || !r.s) { ins.results[it.key] = { s: "ok" }; n++; }
+      }
+      const det = el.closest("details"); if (det && !hasM) det.open = false;
+      put("inspections", ins.id, ins);
+      toast(`${g.t}: ${n} Punkte als i. O. markiert`);
       break;
     }
     case "prio": { const ins = curIns; const r = ins.results[el.dataset.k]; r.prio = v; put("inspections", ins.id, ins); break; }
