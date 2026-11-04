@@ -289,6 +289,30 @@ table.anl .tags .chip { font-size: 12px; padding: 1px 8px; }
 .linkbtn { background: none; border: 0; padding: 0; color: var(--brand); font-weight: 600; text-align: left; }
 .pulse { width: 9px; height: 9px; border-radius: 50%; background: var(--signal); display: inline-block; box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 30%, transparent); }
 .st-state.none { background: var(--surface-2); color: var(--muted); opacity: .6; }
+/* Schaltungen */
+.sws { display: grid; gap: 12px; }
+.sw { display: grid; grid-template-columns: 64px 1fr; gap: 14px; padding: 14px 16px; }
+.sw.cancel { opacity: .6; }
+.sw .when { text-align: center; padding-top: 2px; }
+.sw .day { font-family: var(--font-display); font-size: 30px; line-height: 1; font-weight: 700; }
+.sw .mon { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.sw .soon { margin-top: 6px; font-size: 11px; font-weight: 700; color: var(--warn); }
+.sw-body { display: grid; gap: 6px; min-width: 0; }
+.sw-title { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.sw-title .linkbtn { font-size: 16px; font-weight: 700; }
+.chip.art-MS { background: var(--brand); color: #fff; border-color: transparent; }
+.chip.art-NS { background: var(--warn); color: #fff; border-color: transparent; }
+.chip.art-Trafostation { background: var(--bad); color: #fff; border-color: transparent; }
+.sw-meta { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.sw-join { display: grid; gap: 4px; padding: 10px 12px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line); }
+.sw-join div { font-size: 14px; }
+.sw-aff { font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.strpick { display: flex; flex-wrap: wrap; gap: 6px; }
+.strpick label { display: inline-flex; gap: 6px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 14px; background: var(--surface); }
+.strpick input { width: 18px; height: 18px; accent-color: var(--brand); }
+.sw-box { display: grid; gap: 8px; padding: 12px 14px; border-radius: var(--r); background: var(--warn-soft); }
+.sw-box b { color: var(--fg); }
+@media (max-width: 520px) { .sw { grid-template-columns: 46px 1fr; gap: 10px; } }
 .skel { display: block; height: 12px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); }
 .empty { padding: 28px 16px; text-align: center; display: grid; gap: 10px; justify-items: center; color: var(--muted); }
 .empty .icon { width: 38px; height: 38px; stroke-width: 1.3; }
@@ -381,6 +405,8 @@ const slug = (s) => String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const pad2 = (n) => String(n).padStart(2, "0");
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+const addDays = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+const dayDiff = (a, b) => Math.round((new Date(a + "T12:00:00") - new Date(b + "T12:00:00")) / 864e5);
 const nowHM = () => { const d = new Date(); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
 const fmtDate = (iso) => { if (!iso) return "–"; const [y, m, d] = iso.slice(0, 10).split("-"); return `${d}.${m}.${y}`; };
 const WD = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
@@ -394,14 +420,14 @@ const ls = {
 /* ---------- Zustand ---------- */
 const S = {
   mode: "loading", // loading | db | local
-  data: { stations: {}, log: {}, photos: {}, inspections: {}, anlagen: {}, meta: {}, freigaben: {} },
+  data: { stations: {}, log: {}, photos: {}, inspections: {}, anlagen: {}, meta: {}, freigaben: {}, schaltungen: {}, anmeldungen: {} },
   db: null, assets: null, downloads: null, user: null, myName: "",
   localPhotoURL: {},
   readOnly: false,
   view: { name: "list", sid: null, tab: "buch", folder: null, year: YEAR },
-  ui: { q: "", tech: ls.get("sb.tech"), pYear: YEAR, pTech: "", pBez: "", pShow: "offen", mBez: "", mOnly: "alle", pFrist: `${YEAR}-12-31`, sel: new Set(), pVisible: [], filter: "alle", logOpen: false, draft: null, mfilter: "offen", confirmDel: false, stDraft: null, newStation: null, lightbox: null, open: {} },
+  ui: { q: "", tech: ls.get("sb.tech"), swDraft: null, joinId: null, joinDraft: null, swScope: "meine", swArt: "", pYear: YEAR, pTech: "", pBez: "", pShow: "offen", mBez: "", mOnly: "alle", pFrist: `${YEAR}-12-31`, sel: new Set(), pVisible: [], filter: "alle", logOpen: false, draft: null, mfilter: "offen", confirmDel: false, stDraft: null, newStation: null, lightbox: null, open: {} },
 };
-const COLS = ["stations", "log", "photos", "inspections", "anlagen", "meta", "freigaben"];
+const COLS = ["stations", "log", "photos", "inspections", "anlagen", "meta", "freigaben", "schaltungen", "anmeldungen"];
 /* Stationen = Stationsverzeichnis (meta/stationsverzeichnis, aus der SAP-Stationsliste)
    + eigene Stationsdokumente (Stammdaten-Änderungen, selbst angelegte Stationen). */
 S.raw = { stations: {}, meta: {} };
@@ -664,6 +690,7 @@ function doRender() {
   if (v.name === "station" && S.data.stations[v.sid]) html += viewStation(S.data.stations[v.sid]);
   else if (v.name === "maengel") html += viewMaengel();
   else if (v.name === "planer" && S.isPlaner) html += viewPlaner();
+  else if (v.name === "sw") html += viewSchalt();
   else html += viewList();
   app.classList.toggle("wide", v.name === "planer");
   app.innerHTML = html;
@@ -676,6 +703,7 @@ function renderNav() {
   document.getElementById("topnav").innerHTML = `
     ${S.isPlaner ? `<button data-act="go-planer" ${cur === "planer" ? 'aria-current="page"' : ""}>${ic("bars")}<span class="lbl">Planung</span></button>` : ""}
     <button data-act="go-list" ${cur === "list" || cur === "station" ? 'aria-current="page"' : ""}>${ic("book")}<span class="lbl">Stationen</span></button>
+    <button data-act="go-sw" ${cur === "sw" ? 'aria-current="page"' : ""}>${ic("bolt")}<span class="lbl">Schaltungen</span>${swUpcoming().filter((w) => dayDiff(w.datum, todayISO()) <= 7 && inTech(S.data.stations[w.sid])).length ? `<span class="count" style="background:var(--signal);color:var(--signal-ink)">${swUpcoming().filter((w) => dayDiff(w.datum, todayISO()) <= 7 && inTech(S.data.stations[w.sid])).length}</span>` : ""}</button>
     <button data-act="go-maengel" ${cur === "maengel" ? 'aria-current="page"' : ""}>${ic("alert")}<span class="lbl">Mängel</span>${open ? `<span class="count">${open}</span>` : ""}</button>`;
 }
 function modeNotice() {
@@ -768,7 +796,8 @@ function viewStation(st) {
   const nLog = Object.values(S.data.log).filter((e) => e.sid === st.id).length;
   const nPh = Object.values(S.data.photos).filter((p) => p.sid === st.id).length;
   const state = stationState(st);
-  const stateChip = { none: `<span class="chip">Inspektion ${YEAR} nicht freigegeben</span>`, due: `<span class="chip brand">Inspektion ${YEAR} freigegeben${fg(st.id) && fg(st.id).frist ? " bis " + fmtDate(fg(st.id).frist) : ""}</span>`, wip: `<span class="chip warn">Inspektion ${YEAR} in Arbeit</span>`, done: `<span class="chip ok">${ic("check", "sm")}Inspektion ${YEAR} erledigt</span>` }[state];
+  const nextSw = swUpcoming(st.id)[0];
+  const stateChip = (nextSw ? `<span class="chip art-${esc(nextSw.art)}">${ic("bolt", "sm")}Schaltung ${fmtDate(nextSw.datum).slice(0, 6)}</span>` : "") + { none: `<span class="chip">Inspektion ${YEAR} nicht freigegeben</span>`, due: `<span class="chip brand">Inspektion ${YEAR} freigegeben${fg(st.id) && fg(st.id).frist ? " bis " + fmtDate(fg(st.id).frist) : ""}</span>`, wip: `<span class="chip warn">Inspektion ${YEAR} in Arbeit</span>`, done: `<span class="chip ok">${ic("check", "sm")}Inspektion ${YEAR} erledigt</span>` }[state];
   const tabs = [["buch", "book", "Stationsbuch", nLog], ["fotos", "camera", "Fotos", nPh], ["anlagen", "meter", "Anlagen", null], ["insp", "clip", "Inspektion", null], ["daten", "sliders", "Stammdaten", null]];
   let body = "";
   if (v.tab === "fotos") body = tabFotos(st);
@@ -830,7 +859,9 @@ function tabBuch(st) {
         ${!S.readOnly ? `<button class="btn ghost sm" data-act="log-del" data-id="${esc(e.id)}" aria-label="Eintrag löschen">${ic("trash", "sm")}</button>` : ""}</div>
       </div></article>`;
   }
-  return `${form}<section class="card entries">${list || `<div class="empty">${ic("book")}<b>Noch keine Einträge</b><span>Wer die Station betritt, trägt sich hier mit Grund und Uhrzeit ein.</span></div>`}</section>`;
+  const sws = swUpcoming(st.id);
+  const swHTML = sws.length ? `<div class="sw-box">${ic("bolt")}<b>Geplante Schaltung${sws.length > 1 ? "en" : ""} an dieser Station</b></div><section class="sws">${sws.map((w) => swCard(w, { noStation: true })).join("")}</section>` : "";
+  return `${swHTML}${form}${S.readOnly ? "" : `<button class="btn ghost sm" style="justify-self:start" data-act="sw-new" data-id="${esc(st.id)}">${ic("bolt", "sm")}Schaltung an dieser Station planen</button>`}<section class="card entries">${list || `<div class="empty">${ic("book")}<b>Noch keine Einträge</b><span>Wer die Station betritt, trägt sich hier mit Grund und Uhrzeit ein.</span></div>`}</section>`;
 }
 
 function tabFotos(st) {
@@ -1060,6 +1091,98 @@ function tabDaten(st) {
   </form>`;
 }
 
+/* ---------- Geplante Schaltungen ----------
+   schaltungen/<id>: { sid, art: "MS"|"NS"|"Trafostation", datum, von, bis, straenge[], bereich, grund, verantwortlich, kontakt, status: geplant|abgesagt|durchgeführt, uid, ts }
+   anmeldungen/<id>: { swid, name, firma, arbeit, kontakt, uid, ts }  – andere melden eigene Arbeiten an, damit nur einmal abgeschaltet wird */
+const SW_ART = { MS: "MS-Schaltung", NS: "NS-Schaltung", Trafostation: "Trafostation freigeschaltet" };
+function swAll() { return Object.values(S.data.schaltungen || {}).sort((a, b) => (a.datum + a.von).localeCompare(b.datum + b.von)); }
+function swUpcoming(sid) { const t = todayISO(); return swAll().filter((w) => w.status === "geplant" && w.datum >= t && (!sid || w.sid === sid)); }
+function swJoins(id) { return Object.values(S.data.anmeldungen || {}).filter((a) => a.swid === id).sort((a, b) => (a.ts || "").localeCompare(b.ts || "")); }
+function swAffected(w) {
+  const imp = S.data.anlagen && S.data.anlagen[w.sid]; if (!imp || !imp.straenge) return null;
+  const strs = w.art === "NS" && w.straenge && w.straenge.length ? imp.straenge.filter((x) => w.straenge.includes(x.strang)) : imp.straenge;
+  const all = strs.flatMap((x) => x.anlagen || []);
+  return { n: all.length, v: all.filter((a) => a.verst === 1).length, pv: all.filter((a) => a.anlart === "PV").length };
+}
+function swCard(w, opts = {}) {
+  const st = S.data.stations[w.sid]; const d = new Date(w.datum + "T12:00:00");
+  const joins = swJoins(w.id); const aff = swAffected(w); const inDays = dayDiff(w.datum, todayISO());
+  const mine = (S.myId && w.uid === S.myId) || (!S.myId && w.verantwortlich === (S.myName || ls.get("sb.name")));
+  const canEdit = !S.readOnly && (mine || S.isPlaner);
+  const bereich = w.art === "NS" ? (w.straenge && w.straenge.length ? "Stränge " + w.straenge.map((x) => x.split("-").pop()).join(", ") : w.bereich || "NS-Bereich") : w.art === "MS" ? (w.bereich || "MS-Abschnitt") : "ganze Station";
+  const joinForm = S.ui.joinId === w.id && S.ui.joinDraft ? `<form class="sw-join" data-form="join" data-id="${esc(w.id)}" style="background:var(--surface)">
+      <b>Eigene Arbeiten bei dieser Abschaltung anmelden</b>
+      <div class="grid2"><label class="field"><span>Name</span><input id="jn-name" type="text" required data-bind="joinDraft.name" value="${esc(S.ui.joinDraft.name)}"></label>
+      <label class="field"><span>Firma / Abteilung</span><input id="jn-firma" type="text" data-bind="joinDraft.firma" value="${esc(S.ui.joinDraft.firma)}"></label></div>
+      <label class="field"><span>Welche Arbeiten?</span><input id="jn-arbeit" type="text" required data-bind="joinDraft.arbeit" value="${esc(S.ui.joinDraft.arbeit)}" placeholder="z. B. Kabelverteiler tauschen, Zähler wechseln"></label>
+      <label class="field"><span>Erreichbar unter (optional)</span><input id="jn-kontakt" type="text" data-bind="joinDraft.kontakt" value="${esc(S.ui.joinDraft.kontakt || "")}"></label>
+      <div class="row-flex"><button class="btn primary sm" type="submit">${ic("check", "sm")}Anmelden</button><button class="btn ghost sm" type="button" data-act="sw-join-cancel">Abbrechen</button></div></form>` : "";
+  return `<article class="card sw ${w.status === "abgesagt" ? "cancel" : ""}">
+    <div class="when"><div class="day">${pad2(d.getDate())}</div><div class="mon">${WD[d.getDay()]} · ${MONTHS[d.getMonth()].slice(0, 3)}</div>${w.status === "geplant" && inDays >= 0 && inDays <= 7 ? `<div class="soon">${inDays === 0 ? "heute" : inDays === 1 ? "morgen" : "in " + inDays + " T."}</div>` : ""}</div>
+    <div class="sw-body">
+      <div class="sw-title"><span class="chip art-${esc(w.art)}">${esc(w.art === "Trafostation" ? "Trafostation" : w.art)}</span>${opts.noStation ? "" : `<button class="linkbtn" data-act="open-station" data-id="${esc(w.sid)}">${esc(st ? st.name : w.sid)}</button>`}<span class="mono">${esc(w.von)}–${esc(w.bis)}</span>${w.status === "abgesagt" ? `<span class="chip">abgesagt</span>` : w.status === "durchgeführt" ? `<span class="chip ok">durchgeführt</span>` : ""}</div>
+      <div><b>${esc(SW_ART[w.art] || w.art)}</b> · ${esc(bereich)}</div>
+      ${w.grund ? `<div>${esc(w.grund)}</div>` : ""}
+      <div class="sw-meta"><span>${ic("user", "sm")} ${esc(w.verantwortlich || "–")}</span>${w.kontakt ? `<span>${esc(w.kontakt)}</span>` : ""}${st && st.bezirk ? `<span>${esc(st.bezirk)}</span>` : ""}</div>
+      ${aff ? `<div class="sw-aff"><span class="chip">${aff.n} Anlagen betroffen</span>${aff.v ? `<span class="chip bad">${aff.v} müssen verständigt werden</span>` : ""}${aff.pv ? `<span class="chip brand">${aff.pv} PV</span>` : ""}</div>` : ""}
+      ${joins.length ? `<div class="sw-join"><span class="label">Ebenfalls angemeldet (${joins.length})</span>${joins.map((a) => `<div><b>${esc(a.name)}</b>${a.firma ? ` <span class="muted">(${esc(a.firma)})</span>` : ""}: ${esc(a.arbeit)}${a.kontakt ? ` <span class="muted">· ${esc(a.kontakt)}</span>` : ""}${!S.readOnly && ((S.myId && a.uid === S.myId) || S.isPlaner) && w.status === "geplant" ? ` <button class="btn ghost sm" style="min-height:24px;padding:0 6px" data-act="sw-unjoin" data-id="${esc(a.id)}" aria-label="Anmeldung entfernen">${ic("x", "sm")}</button>` : ""}</div>`).join("")}</div>` : ""}
+      ${joinForm}
+      ${w.status === "geplant" && !S.readOnly && S.ui.joinId !== w.id ? `<div class="row-flex"><button class="btn sm signal" data-act="sw-join" data-id="${esc(w.id)}">${ic("plus", "sm")}Ich habe dort auch Arbeiten</button>
+        ${canEdit ? `<button class="btn ghost sm" data-act="sw-done" data-id="${esc(w.id)}">durchgeführt</button><button class="btn ghost sm" style="color:var(--bad)" data-act="sw-cancel" data-id="${esc(w.id)}">absagen</button>` : ""}</div>` : ""}
+    </div></article>`;
+}
+function swForm() {
+  const d = S.ui.swDraft; if (!d) return "";
+  const st = S.data.stations[d.sid];
+  const imp = st && S.data.anlagen && S.data.anlagen[st.id];
+  // Gleiche Station ±14 Tage schon geplant? -> lieber dort anmelden
+  const near = st && d.datum ? swUpcoming(st.id).filter((w) => Math.abs(dayDiff(w.datum, d.datum)) <= 14) : [];
+  const aff = st ? swAffected({ sid: st.id, art: d.art, straenge: d.straenge }) : null;
+  return `<form class="card pad formcard" data-form="sw">
+    <h2>Schaltung planen</h2>
+    <label class="field"><span>Station</span><input id="sw-st" type="text" list="sw-stations" required data-bind="swDraft.stName" value="${esc(d.stName || "")}" placeholder="Stationsname eingeben" autocomplete="off">
+      <datalist id="sw-stations">${Object.values(S.data.stations).filter(inTech).sort((a, b) => a.name.localeCompare(b.name, "de")).map((x) => `<option value="${esc(x.name)}">`).join("")}</datalist></label>
+    ${d.stName && !st ? `<span class="muted" style="font-size:13px">Station aus der Liste wählen.</span>` : ""}
+    ${near.length ? `<div class="sw-box">${ic("alert")}<div><b>An dieser Station ist schon eine Abschaltung geplant.</b> Statt einer zweiten Abschaltung lieber dort mit anmelden:</div>
+      ${near.map((w) => `<div class="row-flex"><span><b>${fmtDate(w.datum)}</b> ${esc(w.von)}–${esc(w.bis)} · ${esc(SW_ART[w.art])} · ${esc(w.verantwortlich || "")}</span><button type="button" class="btn sm" data-act="sw-join" data-id="${esc(w.id)}">Dort anmelden</button></div>`).join("")}</div>` : ""}
+    <div class="field"><span>Art der Schaltung</span><div class="reasons">${Object.entries(SW_ART).map(([k, l]) => `<button type="button" data-act="sw-art" data-v="${k}" aria-pressed="${d.art === k}">${esc(l)}</button>`).join("")}</div></div>
+    <div class="grid2">
+      <label class="field"><span>Datum</span><input id="sw-datum" type="date" required data-bind="swDraft.datum" value="${esc(d.datum)}"></label>
+      <label class="field"><span>Von</span><input id="sw-von" type="time" required data-bind="swDraft.von" value="${esc(d.von)}"></label>
+      <label class="field"><span>Bis</span><input id="sw-bis" type="time" required data-bind="swDraft.bis" value="${esc(d.bis)}"></label>
+    </div>
+    ${d.art === "NS" && imp && imp.straenge ? `<div class="field"><span>Betroffene Stränge</span><div class="strpick">${imp.straenge.filter((x) => x.strang.includes("-")).map((x) => `<label><input type="checkbox" data-swstr="${esc(x.strang)}" ${d.straenge.includes(x.strang) ? "checked" : ""}>Strang ${esc(x.strang.split("-").pop())} <span class="muted">(${(x.anlagen || []).length})</span></label>`).join("")}</div></div>`
+      : d.art !== "Trafostation" ? `<label class="field"><span>${d.art === "MS" ? "MS-Abschnitt / Schaltstellen" : "Betroffener Bereich (Stränge)"}</span><input id="sw-bereich" type="text" data-bind="swDraft.bereich" value="${esc(d.bereich || "")}"></label>` : ""}
+    ${aff ? `<div class="sw-aff"><span class="chip">${aff.n} Anlagen betroffen</span>${aff.v ? `<span class="chip bad">${aff.v} müssen verständigt werden</span>` : ""}${aff.pv ? `<span class="chip brand">${aff.pv} PV-Anlagen</span>` : ""}</div>` : ""}
+    <label class="field"><span>Grund / geplante Arbeiten</span><textarea id="sw-grund" required data-bind="swDraft.grund" placeholder="z. B. Tausch NS-Verteiler, Trafowechsel">${esc(d.grund)}</textarea></label>
+    <div class="grid2">
+      <label class="field"><span>Verantwortlich</span><input id="sw-verant" type="text" required data-bind="swDraft.verantwortlich" value="${esc(d.verantwortlich)}"></label>
+      <label class="field"><span>Erreichbar unter (optional)</span><input id="sw-kontakt" type="text" data-bind="swDraft.kontakt" value="${esc(d.kontakt || "")}"></label>
+    </div>
+    <div class="row-flex"><button class="btn primary" type="submit">${ic("check")}Schaltung eintragen</button><button class="btn ghost" type="button" data-act="sw-form-cancel">Abbrechen</button></div>
+  </form>`;
+}
+function viewSchalt() {
+  const t = todayISO();
+  const flt = (w) => (S.ui.swScope !== "meine" || inTech(S.data.stations[w.sid])) && (!S.ui.swArt || w.art === S.ui.swArt);
+  const up = swAll().filter((w) => w.datum >= t && w.status !== "durchgeführt" && flt(w));
+  const past = swAll().filter((w) => (w.datum < t || w.status === "durchgeführt") && flt(w)).reverse().slice(0, 20);
+  let lastM = ""; let list = "";
+  for (const w of up) { const m = w.datum.slice(0, 7); if (m !== lastM) { lastM = m; list += `<div class="label" style="padding-top:6px">${MONTHS[Number(m.slice(5)) - 1]} ${m.slice(0, 4)}</div>`; } list += swCard(w); }
+  return `<section class="hello"><h1>Geplante Schaltungen</h1><p class="muted">Freischaltungen von MS, NS oder ganzen Trafostationen. Wer an derselben Stelle Arbeiten hat, meldet sich an – so wird nur einmal abgeschaltet.</p></section>
+    ${S.ui.swDraft ? swForm() : S.readOnly ? "" : `<button class="btn signal" style="justify-self:start" data-act="sw-new">${ic("plus")}Schaltung planen</button>`}
+    <section class="toolbar">
+      ${S.ui.tech ? `<div class="seg" role="group" aria-label="Bereich"><button data-act="sw-scope" data-v="meine" aria-pressed="${S.ui.swScope === "meine"}">Meine Stationen</button><button data-act="sw-scope" data-v="alle" aria-pressed="${S.ui.swScope !== "meine"}">Alle</button></div>` : ""}
+      <div class="seg" role="group" aria-label="Art"><button data-act="sw-fart" data-v="" aria-pressed="${!S.ui.swArt}">Alle</button>${Object.keys(SW_ART).map((k) => `<button data-act="sw-fart" data-v="${k}" aria-pressed="${S.ui.swArt === k}">${k === "Trafostation" ? "Trafostation" : k}</button>`).join("")}</div>
+    </section>
+    <section class="sws">${list || `<div class="card empty">${ic("bolt")}<b>Keine Schaltungen geplant</b><span>Geplante Freischaltungen erscheinen hier für alle Kollegen.</span></div>`}</section>
+    ${past.length ? `<details class="card group"><summary><span class="gicon">${ic("clock")}</span><span><span class="gt">Vergangene Schaltungen</span><br><span class="gs">${past.length} zuletzt</span></span><span></span></summary><div class="sws" style="padding:12px">${past.map((w) => swCard(w)).join("")}</div></details>` : ""}`;
+}
+function swDraftNew(sid) {
+  const st = S.data.stations[sid];
+  S.ui.swDraft = { sid: st ? st.id : "", stName: st ? st.name : "", art: "NS", datum: addDays(todayISO(), 7), von: "08:00", bis: "12:00", straenge: [], bereich: "", grund: "", verantwortlich: S.myName || ls.get("sb.name") || "", kontakt: ls.get("sb.kontakt") || "" };
+}
+
 /* ---------- Planung: Dashboard für den Betriebsplaner ---------- */
 function planRows(Y) {
   return Object.values(S.data.stations).sort((a, b) => a.name.localeCompare(b.name, "de")).map((st) => {
@@ -1181,6 +1304,7 @@ function viewPlaner() {
         </section>
       </div>
       <div>
+        <section class="card" style="overflow:hidden"><div class="panel-h"><h2>Schaltungen nächste 14 Tage</h2><button class="btn ghost sm" data-act="go-sw">Alle</button></div><div class="feed">${swUpcoming().filter((w) => dayDiff(w.datum, today) <= 14).map((w) => { const st = S.data.stations[w.sid]; const j = swJoins(w.id).length; return `<div><span class="t">${fmtDate(w.datum).slice(0, 6)} ${esc(w.von)}</span><span style="min-width:0"><span class="chip art-${esc(w.art)}" style="font-size:11px">${esc(w.art)}</span> <button class="linkbtn" data-act="open-station" data-id="${esc(w.sid)}">${esc(st ? st.name : w.sid)}</button><br><span class="muted" style="font-size:13px">${esc(w.verantwortlich || "")} · ${esc(w.grund || "")}${j ? ` · <b>${j} weitere angemeldet</b>` : ""}</span></span></div>`; }).join("") || `<div class="empty" style="display:grid"><span>Keine Schaltungen geplant.</span></div>`}</div></section>
         <section class="card" style="overflow:hidden"><div class="panel-h"><h2>Jetzt in Station</h2>${nowIn.length ? `<span class="pulse"></span>` : ""}</div><div class="feed">${nowHTML}</div></section>
         <section class="card" style="overflow:hidden"><div class="panel-h"><h2>Letzte Einträge</h2></div><div class="feed">${feedHTML}</div></section>
       </div>
@@ -1243,7 +1367,7 @@ function toast(msg) { const t = document.getElementById("toast"); t.textContent 
 function go(view) {
   Object.assign(S.view, view);
   S.ui.confirmDel = false;
-  const h = S.view.name === "station" ? "#st-" + S.view.sid : S.view.name === "maengel" ? "#maengel" : S.view.name === "planer" ? "#planung" : "";
+  const h = S.view.name === "station" ? "#st-" + S.view.sid : S.view.name === "maengel" ? "#maengel" : S.view.name === "planer" ? "#planung" : S.view.name === "sw" ? "#schaltungen" : "";
   if (location.hash !== h) { try { history.replaceState(null, "", h || location.pathname + location.search); } catch { location.hash = h; } }
   render(); window.scrollTo(0, 0);
 }
@@ -1251,6 +1375,7 @@ function fromHash() {
   const h = location.hash.slice(1);
   if (h === "maengel") S.view.name = "maengel";
   else if (h === "planung") S.view.name = "planer";
+  else if (h === "schaltungen") S.view.name = "sw";
   else if (h.startsWith("st-") && S.data.stations[h.slice(3)]) { S.view.name = "station"; S.view.sid = h.slice(3); }
 }
 window.addEventListener("hashchange", () => { fromHash(); render(); });
@@ -1272,6 +1397,25 @@ document.addEventListener("click", async (ev) => {
     case "go-list": go({ name: "list" }); break;
     case "go-maengel": go({ name: "maengel" }); break;
     case "go-planer": go({ name: "planer" }); break;
+    case "go-sw": go({ name: "sw" }); break;
+    case "sw-new": swDraftNew(id); S.ui.joinId = null; go({ name: "sw" }); setTimeout(() => { const f = document.getElementById(id ? "sw-grund" : "sw-st"); if (f) f.focus(); }, 60); break;
+    case "sw-form-cancel": S.ui.swDraft = null; render(); break;
+    case "sw-art": S.ui.swDraft.art = v; render(); break;
+    case "sw-scope": S.ui.swScope = v; render(); break;
+    case "sw-fart": S.ui.swArt = v; render(); break;
+    case "sw-join": {
+      S.ui.joinId = id; S.ui.joinDraft = { name: S.myName || ls.get("sb.name") || "", firma: ls.get("sb.firma") || "", arbeit: "", kontakt: ls.get("sb.kontakt") || "" };
+      if (S.ui.swDraft && S.ui.swDraft.grund) S.ui.joinDraft.arbeit = S.ui.swDraft.grund;
+      S.ui.swDraft = null; if (S.view.name !== "station") go({ name: "sw" }); else render();
+      setTimeout(() => { const f = document.getElementById(S.ui.joinDraft.name ? "jn-arbeit" : "jn-name"); if (f) { f.focus(); f.scrollIntoView({ block: "center" }); } }, 60); break;
+    }
+    case "sw-join-cancel": S.ui.joinId = null; render(); break;
+    case "sw-unjoin": del("anmeldungen", id); toast("Anmeldung entfernt"); break;
+    case "sw-done": { const w = S.data.schaltungen[id]; w.status = "durchgeführt"; put("schaltungen", id, w); toast("Als durchgeführt markiert"); break; }
+    case "sw-cancel": {
+      if (S.ui.armed !== "sw" + id) { S.ui.armed = "sw" + id; toast("Zum Absagen noch einmal tippen"); setTimeout(() => { if (S.ui.armed === "sw" + id) S.ui.armed = null; }, 3000); break; }
+      S.ui.armed = null; const w = S.data.schaltungen[id]; w.status = "abgesagt"; put("schaltungen", id, w); toast("Schaltung abgesagt"); break;
+    }
     case "p-year": S.ui.pYear = Number(v); S.ui.sel = new Set(); render(); break;
     case "p-bez": S.ui.pBez = v === "ohne Bezirk" ? "" : v; S.ui.pTech = ""; S.ui.pShow = "alle"; S.ui.sel = new Set(); render(); break;
     case "m-only": S.ui.mOnly = v; render(); break;
@@ -1395,13 +1539,23 @@ document.addEventListener("change", async (ev) => {
   if (t.dataset.caption) { const p = S.data.photos[t.dataset.caption]; p.caption = t.value; put("photos", p.id, p, { quiet: true }); return; }
   if (t.dataset.bind && t.type === "checkbox") { setPath(S.ui, t.dataset.bind, t.checked); }
   if (t.dataset.bind && t.tagName === "SELECT") { setPath(S.ui, t.dataset.bind, t.value); if (t.dataset.bind.startsWith("p") || t.dataset.bind === "mBez") { S.ui.sel = new Set(); render(); } }
+  if (t.dataset.swstr) { const a = S.ui.swDraft.straenge; const i = a.indexOf(t.dataset.swstr); if (t.checked && i < 0) a.push(t.dataset.swstr); if (!t.checked && i >= 0) a.splice(i, 1); render(); return; }
   if (t.dataset.sel) { if (t.checked) S.ui.sel.add(t.dataset.sel); else S.ui.sel.delete(t.dataset.sel); render(); return; }
   if (t.id === "tech") { setTech(t.value); }
 });
 
 document.addEventListener("input", (ev) => {
   const t = ev.target;
-  if (t.dataset.bind && t.type !== "checkbox") { setPath(S.ui, t.dataset.bind, t.value); if (t.dataset.bind === "q" || t.dataset.bind === "aq") render(); return; }
+  if (t.dataset.bind && t.type !== "checkbox") {
+    setPath(S.ui, t.dataset.bind, t.value);
+    if (t.dataset.bind === "q" || t.dataset.bind === "aq" || t.dataset.bind === "swDraft.datum") render();
+    if (t.dataset.bind === "swDraft.stName") {
+      const hit = Object.values(S.data.stations).find((x) => x.name.toLowerCase() === t.value.trim().toLowerCase());
+      const sid = hit ? hit.id : "";
+      if (sid !== S.ui.swDraft.sid) { S.ui.swDraft.sid = sid; S.ui.swDraft.straenge = []; render(); }
+    }
+    return;
+  }
   const st = S.data.stations[S.view.sid]; const ins = st && inspFor(st.id, S.view.year);
   if (t.dataset.mess && ins) {
     ins.mess = ins.mess || {};
@@ -1426,6 +1580,21 @@ document.addEventListener("submit", (ev) => {
     const d = S.ui.stDraft; if (!d.name.trim()) return;
     d.name = d.name.trim();
     put("stations", d.id, clone(d)); S.ui.stDraft = null; toast("Stammdaten gespeichert");
+  } else if (f === "sw") {
+    const d = S.ui.swDraft;
+    if (!d.sid) { toast("Bitte eine Station aus der Liste wählen"); document.getElementById("sw-st").focus(); return; }
+    if (d.bis && d.von && d.bis <= d.von) { toast("„Bis“ muss nach „Von“ liegen"); return; }
+    const id = uid();
+    ls.set("sb.kontakt", (d.kontakt || "").trim());
+    put("schaltungen", id, { id, sid: d.sid, art: d.art, datum: d.datum, von: d.von, bis: d.bis, straenge: d.art === "NS" ? d.straenge.slice() : [], bereich: d.art === "Trafostation" ? "" : (d.bereich || "").trim(), grund: d.grund.trim(), verantwortlich: d.verantwortlich.trim(), kontakt: (d.kontakt || "").trim(), status: "geplant", uid: S.myId || null, ts: new Date().toISOString() });
+    S.ui.swDraft = null; toast("Schaltung eingetragen – Kollegen können sich jetzt anmelden");
+  } else if (f === "join") {
+    const d = S.ui.joinDraft; const swid = ev.target.dataset.id;
+    if (!d.name.trim() || !d.arbeit.trim()) return;
+    const id = uid();
+    ls.set("sb.name", d.name.trim()); ls.set("sb.firma", (d.firma || "").trim()); ls.set("sb.kontakt", (d.kontakt || "").trim());
+    put("anmeldungen", id, { id, swid, name: d.name.trim(), firma: (d.firma || "").trim(), arbeit: d.arbeit.trim(), kontakt: (d.kontakt || "").trim(), uid: S.myId || null, ts: new Date().toISOString() });
+    S.ui.joinId = null; toast("Angemeldet – der Verantwortliche sieht deine Arbeiten");
   } else if (f === "newstation") {
     const name = S.ui.newStation.name.trim().toUpperCase(); if (!name) return;
     let id = slug(name); if (S.data.stations[id]) id += "-" + uid().slice(-4);
@@ -1450,7 +1619,7 @@ function demoImage(kind) {
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 }
 function seedDemo() {
-  const d = { stations: baseStations(), log: {}, photos: {}, inspections: {}, anlagen: {}, meta: {}, freigaben: {} };
+  const d = { stations: baseStations(), log: {}, photos: {}, inspections: {}, anlagen: {}, meta: {}, freigaben: {}, schaltungen: {}, anmeldungen: {} };
   const L = (sid, datum, von, bis, name, firma, grund, text, ok = true) => { const id = uid() + Object.keys(d.log).length; d.log[id] = { id, sid, datum, von, bis, name, firma, grund, text, ok, ts: datum }; };
   L("aurachkirchen", "2026-05-20", "08:10", "09:05", "Max Beispiel", "Netzbetrieb (Beispiel)", "Messung / Ablesung", "Amperemeter abgelesen, Schleppzeiger zurückgesetzt.");
   L("aurachkirchen", "2026-09-14", "13:30", "14:20", "Anna Muster", "Netzbetrieb (Beispiel)", "Störung", "NS-Abgang 4 Sicherung 160 A getauscht.");
@@ -1473,12 +1642,15 @@ function seedDemo() {
   template(de).forEach((g) => g.items.forEach((it) => { res2[it.key] = { s: "ok" }; }));
   res2["ns/beschriftung-der-abgange"] = { s: "m", prio: "gering", note: "Beschriftung Abgang 2 verblasst", done: true, doneAt: "2026-06-20" };
   d.freigaben[String(YEAR)] = { jahr: YEAR, stationen: Object.fromEntries(["aurachkirchen", "deutenham", "brauching", "hattenberg", "desselbrunn-lagerhaus", "ehrenfeld"].map((id) => [id, { frist: id === "ehrenfeld" ? `${YEAR}-10-31` : `${YEAR}-12-15`, at: `${YEAR}-03-02`, by: "Betriebsplaner (Beispiel)" }])) };
+  d.schaltungen.sw1 = { id: "sw1", sid: "desselbrunn-lagerhaus", art: "NS", datum: addDays(todayISO(), 5), von: "08:00", bis: "11:30", straenge: ["10041-02"], bereich: "", grund: "Tausch NS-Verteiler Strang 02 (Beispiel)", verantwortlich: "Max Beispiel", kontakt: "", status: "geplant", ts: todayISO() };
+  d.anmeldungen.a1 = { id: "a1", swid: "sw1", name: "Anna Muster", firma: "Netzbetrieb (Beispiel)", arbeit: "Zählertausch Desselbrunn 78", ts: todayISO() };
+  d.schaltungen.sw2 = { id: "sw2", sid: "aurachkirchen", art: "Trafostation", datum: addDays(todayISO(), 12), von: "07:30", bis: "15:00", straenge: [], bereich: "", grund: "Trafowechsel 630 kVA (Beispiel)", verantwortlich: "Firma Beispielbau", kontakt: "", status: "geplant", ts: todayISO() };
   L("desselbrunn-lagerhaus", todayISO(), "07:40", "", "Max Beispiel", "Netzbetrieb (Beispiel)", "Störung", "NS-Abgang 2 ausgelöst, Fehlersuche läuft.", false);
   d.inspections.i2 = { id: "i2", sid: "deutenham", jahr: YEAR, datum: "2026-06-02", pruefer: "Anna Muster", status: "abgeschlossen", closedAt: "2026-06-02", results: res2, mess: {} };
   return d;
 }
 function clearDemo() {
-  S.data = { stations: baseStations(), log: {}, photos: {}, inspections: {}, anlagen: {}, meta: {}, freigaben: {} };
+  S.data = { stations: baseStations(), log: {}, photos: {}, inspections: {}, anlagen: {}, meta: {}, freigaben: {}, schaltungen: {}, anmeldungen: {} };
   S.demo = false; ls.set("sb.demo", false); persistLocal(); toast("Beispiele gelöscht – die Stationen bleiben"); go({ name: "list" });
 }
 
@@ -1486,7 +1658,7 @@ function clearDemo() {
 async function startLocal() {
   S.mode = "local"; S.isPlaner = true;
   const saved = ls.get(LS_KEY);
-  if (saved && saved.stations) { S.data = Object.assign({ stations: {}, log: {}, photos: {}, inspections: {}, anlagen: {}, meta: {}, freigaben: {} }, saved); S.demo = ls.get("sb.demo") !== false && Object.values(S.data.photos).some((p) => p.demo); }
+  if (saved && saved.stations) { S.data = Object.assign({ stations: {}, log: {}, photos: {}, inspections: {}, anlagen: {}, meta: {}, freigaben: {}, schaltungen: {}, anmeldungen: {} }, saved); S.demo = ls.get("sb.demo") !== false && Object.values(S.data.photos).some((p) => p.demo); }
   else { S.data = seedDemo(); S.demo = true; ls.set("sb.demo", true); persistLocal(); }
   try { const blobs = await idb.all(); for (const [k, b] of Object.entries(blobs)) S.localPhotoURL[k] = URL.createObjectURL(b); } catch {}
   fromHash(); render();
