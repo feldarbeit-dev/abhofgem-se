@@ -118,6 +118,9 @@ textarea { min-height: 76px; resize: vertical; }
 .bar > i { display: block; height: 100%; background: var(--ok); border-radius: 99px; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .toolbar .search { flex: 1 1 220px; position: relative; }
+.techsel { position: relative; flex: 1 1 260px; max-width: 420px; }
+.techsel .icon { position: absolute; left: 11px; top: 11px; color: var(--brand); pointer-events: none; }
+.techsel select { padding-left: 38px; font-weight: 600; border-color: var(--brand); }
 .toolbar .search input { padding-left: 38px; }
 .toolbar .search .icon { position: absolute; left: 11px; top: 11px; color: var(--muted); }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: var(--surface); }
@@ -343,14 +346,33 @@ const ls = {
 /* ---------- Zustand ---------- */
 const S = {
   mode: "loading", // loading | db | local
-  data: { stations: {}, log: {}, photos: {}, inspections: {}, anlagen: {} },
+  data: { stations: {}, log: {}, photos: {}, inspections: {}, anlagen: {}, meta: {} },
   db: null, assets: null, downloads: null, user: null, myName: "",
   localPhotoURL: {},
   readOnly: false,
   view: { name: "list", sid: null, tab: "buch", folder: null, year: YEAR },
-  ui: { q: "", filter: "alle", logOpen: false, draft: null, mfilter: "offen", confirmDel: false, stDraft: null, newStation: null, lightbox: null, open: {} },
+  ui: { q: "", tech: ls.get("sb.tech"), filter: "alle", logOpen: false, draft: null, mfilter: "offen", confirmDel: false, stDraft: null, newStation: null, lightbox: null, open: {} },
 };
-const COLS = ["stations", "log", "photos", "inspections", "anlagen"];
+const COLS = ["stations", "log", "photos", "inspections", "anlagen", "meta"];
+/* Stationen = Stationsverzeichnis (meta/stationsverzeichnis, aus der SAP-Stationsliste)
+   + eigene Stationsdokumente (Stammdaten-Änderungen, selbst angelegte Stationen). */
+S.raw = { stations: {}, meta: {} };
+S.dirIds = new Set();
+function mergeStations() {
+  const out = {}; S.dirIds = new Set();
+  const dir = S.raw.meta && S.raw.meta.stationsverzeichnis;
+  if (dir && Array.isArray(dir.stations)) for (const r of dir.stations) {
+    const [nr, name, ort, bezirk, techniker, status, eigentum] = r;
+    const id = slug(name); S.dirIds.add(id);
+    out[id] = { id, name, nr, ort, bezirk, techniker, status, eigentum, typ: "", trafoInv: "", kva: "", stufe: "", ms: "", dk: false, gps: "", notiz: "", sap: "" };
+  }
+  for (const [id, d] of Object.entries(S.raw.stations || {})) {
+    const merged = Object.assign({}, out[id] || {});
+    for (const [k, v] of Object.entries(d)) if ((v !== "" && v != null) || !(k in merged)) merged[k] = v;
+    out[id] = merged;
+  }
+  return out;
+}
 
 /* ---------- Speicher ---------- */
 const LS_KEY = "stationsbuch.v1";
@@ -528,8 +550,8 @@ function exportInspCSV(st, ins) {
   offerFile(`Reparaturliste_${slug(st.name)}_${ins.jahr}.csv`, toCSV(repairRows(list)), "text/csv");
 }
 function exportAllCSV() {
-  const list = defectsAll().filter((d) => S.ui.mfilter === "alle" || !d.r.done);
-  offerFile(`Maengelliste_alle_Stationen_${todayISO()}.csv`, toCSV(repairRows(list)), "text/csv");
+  const list = defectsAll().filter((d) => inTech(d.st) && (S.ui.mfilter === "alle" || !d.r.done));
+  offerFile(`Maengelliste_${S.ui.tech ? slug(S.ui.tech) : "alle_Stationen"}_${todayISO()}.csv`, toCSV(repairRows(list)), "text/csv");
 }
 function exportInspHTML(st, ins) {
   const groups = template(st);
@@ -589,7 +611,7 @@ function doRender() {
   if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus({ preventScroll: true }); if (sel) try { el.setSelectionRange(sel[0], sel[1]); } catch {} } }
 }
 function renderNav() {
-  const open = defectsAll().filter((d) => !d.r.done).length;
+  const open = defectsAll().filter((d) => !d.r.done && inTech(d.st)).length;
   const cur = S.view.name;
   document.getElementById("topnav").innerHTML = `
     <button data-act="go-list" ${cur !== "maengel" ? 'aria-current="page"' : ""}>${ic("book")}<span class="lbl">Stationen</span></button>
@@ -602,20 +624,45 @@ function modeNotice() {
   return h;
 }
 
+/* Netztechniker-Filter */
+function techList() {
+  const c = {};
+  for (const s of Object.values(S.data.stations)) if (s.techniker) c[s.techniker] = (c[s.techniker] || 0) + 1;
+  return Object.entries(c).sort((a, b) => a[0].localeCompare(b[0], "de"));
+}
+const inTech = (st) => !S.ui.tech || (st && st.techniker === S.ui.tech);
+function techSelect() {
+  const techs = techList(); if (!techs.length) return "";
+  const total = Object.keys(S.data.stations).length;
+  const cur = S.ui.tech || "";
+  return `<label class="techsel">${ic("user")}<select id="tech" aria-label="Netztechniker">
+    <option value="" ${cur ? "" : "selected"}>Alle Netztechniker (${total})</option>
+    ${techs.map(([t, n]) => `<option value="${esc(t)}" ${cur === t ? "selected" : ""}>${esc(t)} (${n})</option>`).join("")}
+  </select></label>`;
+}
+function setTech(v) { S.ui.tech = v; ls.set("sb.tech", v); render(); }
+// Beim ersten Öffnen: eigenen Namen in der Techniker-Liste suchen („Jakob Grafinger“ = „Grafinger Jakob“)
+function autoTech() {
+  if (S.ui.tech != null || !S.myName) return;
+  const key = (s) => s.toLowerCase().split(/\s+/).filter(Boolean).sort().join(" ");
+  const hit = techList().find(([t]) => key(t) === key(S.myName));
+  if (hit) { S.ui.tech = hit[0]; render(); }
+}
+
 /* Liste */
 function viewList() {
-  const sts = Object.values(S.data.stations).sort((a, b) => a.name.localeCompare(b.name, "de"));
+  const sts = Object.values(S.data.stations).filter(inTech).sort((a, b) => a.name.localeCompare(b.name, "de"));
   const states = sts.map((s) => stationState(s));
   const done = states.filter((s) => s === "done").length;
   const wip = states.filter((s) => s === "wip").length;
-  const defects = defectsAll().filter((d) => !d.r.done);
+  const defects = defectsAll().filter((d) => !d.r.done && inTech(d.st));
   const hoch = defects.filter((d) => d.r.prio === "hoch").length;
   const since = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
-  const visits = Object.values(S.data.log).filter((e) => e.datum >= since).length;
+  const visits = Object.values(S.data.log).filter((e) => e.datum >= since && inTech(S.data.stations[e.sid])).length;
   const q = S.ui.q.trim().toLowerCase();
   const openBySt = {}; defects.forEach((d) => { openBySt[d.st.id] = (openBySt[d.st.id] || 0) + 1; });
   const list = sts.filter((s) => {
-    if (q && !(s.name + " " + (s.nr || "") + " " + (s.ort || "")).toLowerCase().includes(q)) return false;
+    if (q && !(s.name + " " + (s.nr || "") + " " + (s.ort || "") + " " + (s.bezirk || "")).toLowerCase().includes(q)) return false;
     if (S.ui.filter === "faellig" && stationState(s) === "done") return false;
     if (S.ui.filter === "maengel" && !openBySt[s.id]) return false;
     return true;
@@ -624,21 +671,22 @@ function viewList() {
   const stTitle = { due: `Inspektion ${YEAR} fällig`, wip: `Inspektion ${YEAR} in Arbeit`, done: `Inspektion ${YEAR} erledigt` };
   const rows = list.map((s) => {
     const state = stationState(s); const lv = lastVisit(s.id);
-    const sub = [s.typ, s.kva ? s.kva + " kVA" : "", lv ? `zuletzt ${fmtDate(lv.datum)} · ${lv.name}` : "noch kein Eintrag"].filter(Boolean).join(" · ");
+    const sub = [s.nr, s.ort, !S.ui.tech && s.techniker ? s.techniker : "", s.kva ? s.kva + " kVA" : "", lv ? `zuletzt ${fmtDate(lv.datum)} · ${lv.name}` : ""].filter(Boolean).join(" · ");
     return `<button class="st" data-act="open-station" data-id="${esc(s.id)}">
       <span class="st-state ${state}" title="${stTitle[state]}">${ic(stIcon[state])}</span>
       <span style="min-width:0"><span class="st-name">${esc(s.name)}</span><br><span class="st-sub">${esc(sub)}</span></span>
-      <span class="st-right">${openBySt[s.id] ? `<span class="chip bad">${ic("alert", "sm")}${openBySt[s.id]}</span>` : ""}${ic("chevron")}</span>
+      <span class="st-right">${s.status === "in Planung" ? `<span class="chip">in Planung</span>` : ""}${s.eigentum === "fremd" ? `<span class="chip">fremd</span>` : ""}${openBySt[s.id] ? `<span class="chip bad">${ic("alert", "sm")}${openBySt[s.id]}</span>` : ""}${ic("chevron")}</span>
     </button>`;
   }).join("");
   const n = sts.length || 1;
   return `
-  <section class="hello"><h1>Stationen</h1><p class="muted">Eintragen beim Betreten, Fotos ablegen, Jahresinspektion ${YEAR} durchführen.</p></section>
+  <section class="hello"><h1>${S.ui.tech ? "Meine Stationen" : "Stationen"}</h1><p class="muted">${S.ui.tech ? `${esc(S.ui.tech)} · ${sts.length} Stationen` : "Eintragen beim Betreten, Fotos ablegen, Jahresinspektion " + YEAR + " durchführen."}</p></section>
+  ${techSelect() ? `<section class="toolbar">${techSelect()}</section>` : ""}
   <section class="stats">
     <div class="card stat"><span class="label">Inspektion ${YEAR}</span><span class="big">${done}<small> / ${sts.length} erledigt</small></span>
       <div class="bar" role="img" aria-label="${done} von ${sts.length} erledigt"><i style="width:${(done / n) * 100}%"></i></div><span class="muted" style="font-size:13px">${wip} in Arbeit · ${sts.length - done - wip} fällig</span></div>
     <div class="card stat"><span class="label">Offene Mängel</span><span class="big" style="color:${defects.length ? "var(--bad)" : "var(--ok)"}">${defects.length}</span><span class="muted" style="font-size:13px">${hoch} davon dringend</span></div>
-    <div class="card stat"><span class="label">Besuche letzte 30 Tage</span><span class="big">${visits}</span><span class="muted" style="font-size:13px">Einträge in allen Stationsbüchern</span></div>
+    <div class="card stat"><span class="label">Besuche letzte 30 Tage</span><span class="big">${visits}</span><span class="muted" style="font-size:13px">Einträge in ${S.ui.tech ? "deinen" : "allen"} Stationsbüchern</span></div>
   </section>
   <section class="toolbar">
     <label class="search">${ic("search")}<input id="q" type="search" placeholder="Station suchen" value="${esc(S.ui.q)}" data-bind="q" aria-label="Station suchen"></label>
@@ -671,7 +719,7 @@ function viewStation(st) {
   <nav class="crumbs" aria-label="Pfad"><button data-act="go-list">Stationen</button>${ic("chevron", "sm")}<span>${esc(st.name)}</span></nav>
   <section class="sthead">
     <div style="min-width:0"><h1>${esc(st.name)}</h1>
-      <div class="facts">${st.typ ? `<span>${esc(st.typ)}</span>` : ""}${st.trafoInv ? `<span>Trafo <b class="mono">${esc(st.trafoInv)}</b></span>` : ""}${st.kva ? `<span><b class="mono">${esc(st.kva)}</b> kVA</span>` : ""}${st.ms ? `<span>MS <b>${esc(st.ms)}</b></span>` : ""}${stateChip}</div>
+      <div class="facts">${st.nr ? `<span>Nr. <b class="mono">${esc(st.nr)}</b></span>` : ""}${st.ort ? `<span>${esc(st.ort)}</span>` : ""}${st.bezirk ? `<span>Bezirk <b>${esc(st.bezirk)}</b></span>` : ""}${st.techniker ? `<span>${ic("user", "sm")} <b>${esc(st.techniker)}</b></span>` : ""}${st.typ ? `<span>${esc(st.typ)}</span>` : ""}${st.trafoInv ? `<span>Trafo <b class="mono">${esc(st.trafoInv)}</b></span>` : ""}${st.kva ? `<span><b class="mono">${esc(st.kva)}</b> kVA</span>` : ""}${st.ms ? `<span>MS <b>${esc(st.ms)}</b></span>` : ""}${stateChip}</div>
     </div>
     <div class="row-flex">
       <a class="btn" href="${esc(maps)}" target="_blank" rel="noopener">${ic("route")}Navigation</a>
@@ -924,7 +972,9 @@ function tabDaten(st) {
       <label class="field"><span>Stationsname</span><input id="sd-name" type="text" required data-bind="stDraft.name" value="${esc(d.name)}" ${ro}></label>
       <label class="field"><span>Stationsnummer</span><input id="sd-nr" type="text" data-bind="stDraft.nr" value="${esc(d.nr || "")}" ${ro}></label>
       <label class="field"><span>Bauart</span><select id="sd-typ" data-bind="stDraft.typ" ${ro}>${["", "Kompaktstation", "Begehbare Station", "Turmstation", "Maststation", "Kabelverteiler"].map((t) => `<option value="${t}" ${d.typ === t ? "selected" : ""}>${t || "– nicht erfasst –"}</option>`).join("")}</select></label>
-      <label class="field"><span>Ort / Adresse</span><input id="sd-ort" type="text" data-bind="stDraft.ort" value="${esc(d.ort || "")}" ${ro}></label>
+      <label class="field"><span>Netzbezirk</span><input id="sd-bezirk" type="text" data-bind="stDraft.bezirk" value="${esc(d.bezirk || "")}" placeholder="z. B. S3/09" ${ro}></label>
+      <label class="field"><span>Netztechniker</span><input id="sd-tech" type="text" list="techs" data-bind="stDraft.techniker" value="${esc(d.techniker || "")}" ${ro}><datalist id="techs">${techList().map(([t]) => `<option value="${esc(t)}">`).join("")}</datalist></label>
+      <label class="field"><span>Gemeinde / Adresse</span><input id="sd-ort" type="text" data-bind="stDraft.ort" value="${esc(d.ort || "")}" ${ro}></label>
       <label class="field"><span>SAP Techn. Platz / Equipment</span><input id="sd-sap" type="text" data-bind="stDraft.sap" value="${esc(d.sap || "")}" placeholder="für Anlagen & Zähler aus SAP" ${ro}></label>
     </div>
     <div class="grid2">
@@ -938,15 +988,17 @@ function tabDaten(st) {
     <label class="field"><span>Hinweise (Schlüssel, Zufahrt …)</span><textarea id="sd-notiz" data-bind="stDraft.notiz" ${ro}>${esc(d.notiz || "")}</textarea></label>
     ${ro ? "" : `<div class="row-flex"><button class="btn primary" type="submit">${ic("check")}Speichern</button>
       ${S.ui.confirmDel ? `<span class="muted">Station mit allen Einträgen, Fotos und Inspektionen löschen?</span><button type="button" class="btn danger" data-act="st-del-yes">Ja, löschen</button><button type="button" class="btn ghost" data-act="st-del-no">Nein</button>`
-        : `<button type="button" class="btn danger" data-act="st-del" style="margin-left:auto">${ic("trash")}Station löschen</button>`}</div>`}
+        : S.dirIds.has(st.id) ? `<span class="muted" style="margin-left:auto;font-size:13px">Station aus dem Stationsverzeichnis – kann hier nicht gelöscht werden.</span>` : `<button type="button" class="btn danger" data-act="st-del" style="margin-left:auto">${ic("trash")}Station löschen</button>`}</div>`}
   </form>`;
 }
 
 function viewMaengel() {
-  const all = defectsAll();
+  const all = defectsAll().filter((d) => inTech(d.st));
   const list = all.filter((d) => S.ui.mfilter === "alle" || !d.r.done);
   const openN = all.filter((d) => !d.r.done).length;
-  return `<section class="hello"><h1>Mängel</h1><p class="muted">Alle bei Inspektionen festgestellten Mängel über alle Stationen – sortiert nach Dringlichkeit.</p></section>
+  return `<section class="hello"><h1>Mängel</h1><p class="muted">Bei Inspektionen festgestellte Mängel ${S.ui.tech ? "in den Stationen von " + esc(S.ui.tech) : "über alle Stationen"} – sortiert nach Dringlichkeit.</p></section>
+  <section class="toolbar">${techSelect()}
+  </section>
   <section class="toolbar">
     <div class="seg" role="group" aria-label="Filter"><button data-act="mfilter" data-v="offen" aria-pressed="${S.ui.mfilter === "offen"}">Offen (${openN})</button><button data-act="mfilter" data-v="alle" aria-pressed="${S.ui.mfilter === "alle"}">Alle (${all.length})</button></div>
     <button class="btn" data-act="exp-all" style="margin-left:auto" ${list.length ? "" : "disabled"}>${ic("download")}Als Tabelle herunterladen</button>
@@ -1105,6 +1157,7 @@ document.addEventListener("change", async (ev) => {
   if (t.dataset.caption) { const p = S.data.photos[t.dataset.caption]; p.caption = t.value; put("photos", p.id, p, { quiet: true }); return; }
   if (t.dataset.bind && t.type === "checkbox") { setPath(S.ui, t.dataset.bind, t.checked); }
   if (t.dataset.bind && t.tagName === "SELECT") { setPath(S.ui, t.dataset.bind, t.value); }
+  if (t.id === "tech") { setTech(t.value); }
 });
 
 document.addEventListener("input", (ev) => {
@@ -1157,7 +1210,7 @@ function demoImage(kind) {
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 }
 function seedDemo() {
-  const d = { stations: baseStations(), log: {}, photos: {}, inspections: {}, anlagen: {} };
+  const d = { stations: baseStations(), log: {}, photos: {}, inspections: {}, anlagen: {}, meta: {} };
   const L = (sid, datum, von, bis, name, firma, grund, text, ok = true) => { const id = uid() + Object.keys(d.log).length; d.log[id] = { id, sid, datum, von, bis, name, firma, grund, text, ok, ts: datum }; };
   L("aurachkirchen", "2026-05-20", "08:10", "09:05", "Max Beispiel", "Netzbetrieb (Beispiel)", "Messung / Ablesung", "Amperemeter abgelesen, Schleppzeiger zurückgesetzt.");
   L("aurachkirchen", "2026-09-14", "13:30", "14:20", "Anna Muster", "Netzbetrieb (Beispiel)", "Störung", "NS-Abgang 4 Sicherung 160 A getauscht.");
@@ -1183,7 +1236,7 @@ function seedDemo() {
   return d;
 }
 function clearDemo() {
-  S.data = { stations: baseStations(), log: {}, photos: {}, inspections: {}, anlagen: {} };
+  S.data = { stations: baseStations(), log: {}, photos: {}, inspections: {}, anlagen: {}, meta: {} };
   S.demo = false; ls.set("sb.demo", false); persistLocal(); toast("Beispiele gelöscht – die Stationen bleiben"); go({ name: "list" });
 }
 
@@ -1191,7 +1244,7 @@ function clearDemo() {
 async function startLocal() {
   S.mode = "local";
   const saved = ls.get(LS_KEY);
-  if (saved && saved.stations) { S.data = Object.assign({ stations: {}, log: {}, photos: {}, inspections: {}, anlagen: {} }, saved); S.demo = ls.get("sb.demo") !== false && Object.values(S.data.photos).some((p) => p.demo); }
+  if (saved && saved.stations) { S.data = Object.assign({ stations: {}, log: {}, photos: {}, inspections: {}, anlagen: {}, meta: {} }, saved); S.demo = ls.get("sb.demo") !== false && Object.values(S.data.photos).some((p) => p.demo); }
   else { S.data = seedDemo(); S.demo = true; ls.set("sb.demo", true); persistLocal(); }
   try { const blobs = await idb.all(); for (const [k, b] of Object.entries(blobs)) S.localPhotoURL[k] = URL.createObjectURL(b); } catch {}
   fromHash(); render();
@@ -1203,7 +1256,8 @@ async function startDb(db) {
   for (const col of COLS) {
     db.collection(col).onSnapshot((snap) => {
       const next = {}; snap.docs.forEach((doc) => { next[doc.id] = Object.assign(clone(doc.data()), { id: doc.id }); });
-      S.data[col] = next;
+      if (col === "stations" || col === "meta") { S.raw[col] = next; S.data.meta = S.raw.meta; S.data.stations = mergeStations(); }
+      else S.data[col] = next;
       if (pending.has(col)) { pending.delete(col); if (!pending.size) { clearTimeout(timer); fromHash(); } }
       if (!pending.size) render();
     }, (e) => { toast("Verbindung zur Datenbank unterbrochen (" + (e && e.code) + ")"); });
@@ -1222,6 +1276,7 @@ async function startDb(db) {
     c.use("user").then(async (u) => {
       if (!u) return; S.user = u;
       try { S.myId = await u.id(); S.myName = (await u.name()) || ""; } catch {}
+      autoTech();
       try { const w = await u.can("data.write"); if (w === false) { S.readOnly = true; render(); } } catch {}
     }).catch(() => {});
   }
