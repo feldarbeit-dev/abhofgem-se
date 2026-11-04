@@ -257,7 +257,20 @@ table.anl .tags .chip { font-size: 12px; padding: 1px 8px; }
 .panel-h h2 { font-family: var(--font-display); font-size: 21px; font-weight: 700; }
 .stack { display: flex; height: 10px; border-radius: 99px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--line); min-width: 120px; }
 .stack i { display: block; height: 100%; }
-.stack .s-abg { background: var(--ok); } .stack .s-done { background: color-mix(in srgb, var(--ok) 45%, var(--surface)); }
+.stack .s-done { background: var(--ok); }
+.mrank { display: grid; }
+.mrow { border-top: 1px solid var(--line); }
+.mrow:first-child { border-top: 0; }
+.mrow > summary { list-style: none; display: grid; grid-template-columns: 30px 1fr auto; gap: 12px; align-items: center; padding: 10px 14px; cursor: pointer; }
+.mrow > summary::-webkit-details-marker { display: none; }
+.mrow > summary:hover { background: var(--surface-2); }
+.mrow .rk { color: var(--muted); font-size: 13px; text-align: right; }
+.mcounts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; }
+.mcounts .chip { font-size: 12px; }
+.mtotal { min-width: 28px; text-align: right; font-weight: 600; }
+.mcounts > .icon { color: var(--muted); }
+.mrow[open] .mcounts > .icon { transform: rotate(90deg); }
+@media (max-width: 520px) { .mrow > summary { grid-template-columns: 22px 1fr; } .mcounts { grid-column: 2; justify-content: flex-start; } }
 .stack .s-wip { background: var(--warn); } .stack .s-due { background: var(--brand); opacity: .55; }
 .plegend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); padding: 10px 16px; }
 .plegend span { display: inline-flex; gap: 6px; align-items: center; }
@@ -386,7 +399,7 @@ const S = {
   localPhotoURL: {},
   readOnly: false,
   view: { name: "list", sid: null, tab: "buch", folder: null, year: YEAR },
-  ui: { q: "", tech: ls.get("sb.tech"), pYear: YEAR, pTech: "", pBez: "", pShow: "offen", pFrist: `${YEAR}-12-31`, sel: new Set(), pVisible: [], filter: "alle", logOpen: false, draft: null, mfilter: "offen", confirmDel: false, stDraft: null, newStation: null, lightbox: null, open: {} },
+  ui: { q: "", tech: ls.get("sb.tech"), pYear: YEAR, pTech: "", pBez: "", pShow: "offen", mBez: "", mOnly: "alle", pFrist: `${YEAR}-12-31`, sel: new Set(), pVisible: [], filter: "alle", logOpen: false, draft: null, mfilter: "offen", confirmDel: false, stDraft: null, newStation: null, lightbox: null, open: {} },
 };
 const COLS = ["stations", "log", "photos", "inspections", "anlagen", "meta", "freigaben"];
 /* Stationen = Stationsverzeichnis (meta/stationsverzeichnis, aus der SAP-Stationsliste)
@@ -546,7 +559,7 @@ function inspStats(ins, st) {
   return { total, answered, defects, open, messDone };
 }
 /* Freigaben (nur Betriebsplaner schreibt): Sammlung "freigaben", ein Dokument je Jahr
-   { jahr, stationen: { <sid>: { frist, at, by, abgenommen, abnahmeAt, abnahmeBy } } } */
+   { jahr, stationen: { <sid>: { frist, at, by } } } */
 function fg(sid, year = YEAR) { const d = S.data.freigaben && S.data.freigaben[String(year)]; return d && d.stationen ? d.stationen[sid] || null : null; }
 function overdue(st, year = YEAR) { const f = fg(st.id, year); return !!(f && f.frist && f.frist < todayISO() && stationState(st, year) !== "done"); }
 function saveFg(year, fn) {
@@ -587,8 +600,8 @@ function lastVisit(sid) {
 function csvCell(v) { const s = String(v ?? ""); return /[;"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
 function toCSV(rows) { return "﻿" + rows.map((r) => r.map(csvCell).join(";")).join("\r\n"); }
 function repairRows(list) {
-  return [["Station", "Jahr", "Bereich", "Prüfpunkt", "Priorität", "Mangel / Bemerkung", "Status", "Erledigt am", "Prüfer"]]
-    .concat(list.map(({ ins, st, g, it, r }) => [st.name, ins.jahr, g.t, it.label, PRIO_LABEL[r.prio || "mittel"], r.note || "", r.done ? "erledigt" : "offen", r.doneAt ? fmtDate(r.doneAt) : "", ins.pruefer || ""]));
+  return [["Station", "Stationsnr.", "Netzbezirk", "Netztechniker", "Jahr", "Bereich", "Prüfpunkt", "Priorität", "Mangel / Bemerkung", "Status", "Erledigt am", "Prüfer"]]
+    .concat(list.map(({ ins, st, g, it, r }) => [st.name, st.nr || "", st.bezirk || "", st.techniker || "", ins.jahr, g.t, it.label, PRIO_LABEL[r.prio || "mittel"], r.note || "", r.done ? "erledigt" : "offen", r.doneAt ? fmtDate(r.doneAt) : "", ins.pruefer || ""]));
 }
 function exportInspCSV(st, ins) {
   const list = defectsAll().filter((d) => d.ins.id === ins.id);
@@ -863,7 +876,7 @@ function tabInsp(st) {
   const pct = stat.total ? Math.round(stat.answered / stat.total * 100) : 0;
   const head = `<section class="card pad insp-head">
     <div class="row-flex" style="justify-content:space-between">${yearSel}
-      <span class="row-flex" style="gap:6px">${ins.status === "abgeschlossen" ? `<span class="chip ok">${ic("check", "sm")}abgeschlossen ${fmtDate(ins.closedAt)}</span>${fr && fr.abgenommen ? `<span class="chip ok">abgenommen ${fmtDate(fr.abnahmeAt)}${fr.abnahmeBy ? " · " + esc(fr.abnahmeBy) : ""}</span>` : `<span class="chip warn">wartet auf Abnahme</span>${S.isPlaner && !S.readOnly ? `<button class="btn sm primary" data-act="p-abnahme" data-id="${esc(st.id)}" data-year="${year}">Abnehmen</button>` : ""}`}` : `<span class="chip warn">in Arbeit</span>${fr && fr.frist ? `<span class="chip ${fr.frist < todayISO() ? "bad" : ""}">fällig bis ${fmtDate(fr.frist)}</span>` : ""}`}</span></div>
+      <span class="row-flex" style="gap:6px">${ins.status === "abgeschlossen" ? `<span class="chip ok">${ic("check", "sm")}abgeschlossen ${fmtDate(ins.closedAt)}</span>` : `<span class="chip warn">in Arbeit</span>${fr && fr.frist ? `<span class="chip ${fr.frist < todayISO() ? "bad" : ""}">fällig bis ${fmtDate(fr.frist)}</span>` : ""}`}</span></div>
     <div class="grid2">
       <label class="field"><span>Inspektionsdatum</span><input id="in-datum" type="date" value="${esc(ins.datum)}" data-ins="datum" ${ro ? "disabled" : ""}></label>
       <label class="field"><span>Prüfer</span><input id="in-pruefer" type="text" value="${esc(ins.pruefer)}" data-ins="pruefer" ${ro ? "disabled" : ""}></label>
@@ -919,9 +932,7 @@ function tabInsp(st) {
 
   const canClose = stat.answered === stat.total;
   const foot = S.readOnly ? "" : ins.status === "abgeschlossen"
-    ? (fr && fr.abgenommen
-      ? `<div class="row-flex"><span class="muted">Vom Betriebsplaner abgenommen – keine Änderungen mehr möglich.</span>${S.isPlaner ? `<button class="btn ghost sm" data-act="p-abnahme-undo" data-id="${esc(st.id)}" data-year="${year}">Abnahme zurücknehmen</button>` : ""}</div>`
-      : `<div class="row-flex"><button class="btn" data-act="insp-reopen">Inspektion wieder öffnen</button></div>`)
+    ? `<div class="row-flex"><button class="btn" data-act="insp-reopen">Inspektion wieder öffnen</button></div>`
     : `<div class="row-flex"><button class="btn primary" data-act="insp-close" ${canClose ? "" : "disabled"}>${ic("check")}Inspektion abschließen</button>${canClose ? "" : `<span class="muted">Noch ${stat.total - stat.answered} Prüfpunkte offen.</span>`}</div>`;
   return head + `<section class="groups">${groupHTML}</section>` + messHTML + repair + foot;
 }
@@ -1052,87 +1063,115 @@ function tabDaten(st) {
 /* ---------- Planung: Dashboard für den Betriebsplaner ---------- */
 function planRows(Y) {
   return Object.values(S.data.stations).sort((a, b) => a.name.localeCompare(b.name, "de")).map((st) => {
-    const f = fg(st.id, Y); const ins = inspFor(st.id, Y); const state = stationState(st, Y);
-    return { st, f, ins, state, stat: ins ? inspStats(ins, st) : null, over: overdue(st, Y), abg: !!(f && f.abgenommen) };
+    const ins = inspFor(st.id, Y); const state = stationState(st, Y);
+    return { st, f: fg(st.id, Y), ins, state, stat: ins ? inspStats(ins, st) : null, over: overdue(st, Y) };
   });
+}
+/* Stationen nach offenen Mängeln: zuerst nach dringenden, dann nach Gesamtzahl */
+function defectRanking() {
+  const by = {};
+  defectsAll().filter((d) => !d.r.done).forEach((d) => { (by[d.st.id] = by[d.st.id] || { st: d.st, list: [] }).list.push(d); });
+  return Object.values(by).map((x) => {
+    const c = (p) => x.list.filter((d) => (d.r.prio || "mittel") === p).length;
+    return { ...x, hoch: c("hoch"), mittel: c("mittel"), gering: c("gering"), n: x.list.length };
+  }).sort((a, b) => b.hoch - a.hoch || b.n - a.n || b.mittel - a.mittel || a.st.name.localeCompare(b.st.name, "de"));
 }
 function viewPlaner() {
   const Y = Number(S.ui.pYear) || YEAR; const today = todayISO();
   const rows = planRows(Y);
   const cnt = (k) => rows.filter((r) => r.state === k).length;
   const total = rows.length, frei = total - cnt("none"), done = cnt("done"), wip = cnt("wip");
-  const abg = rows.filter((r) => r.abg).length, over = rows.filter((r) => r.over).length;
-  const pending = rows.filter((r) => r.state === "done" && !r.abg);
-  const defects = defectsAll().filter((d) => !d.r.done); const hoch = defects.filter((d) => d.r.prio === "hoch");
+  const over = rows.filter((r) => r.over).length;
+  const rank = defectRanking();
+  const openN = rank.reduce((n, x) => n + x.n, 0), hochSt = rank.filter((x) => x.hoch).length, hochN = rank.reduce((n, x) => n + x.hoch, 0);
   const logs = Object.values(S.data.log).sort((a, b) => (b.datum + b.von).localeCompare(a.datum + a.von));
   const nowIn = logs.filter((e) => e.datum === today && !e.bis);
   const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+  const bezirke = [...new Set(rows.map((r) => r.st.bezirk).filter(Boolean))].sort();
 
-  // Fortschritt je Netztechniker
-  const byTech = {};
-  rows.forEach((r) => { const t = r.st.techniker || "ohne Zuordnung"; (byTech[t] = byTech[t] || []).push(r); });
-  const openByTech = {}; defects.forEach((d) => { const t = d.st.techniker || "ohne Zuordnung"; openByTech[t] = (openByTech[t] || 0) + 1; });
-  const techRows = Object.entries(byTech).sort((a, b) => a[0].localeCompare(b[0], "de")).map(([t, rs]) => {
+  // 1) Stationen nach Mängeln
+  const rk = rank.filter((x) => (!S.ui.mBez || x.st.bezirk === S.ui.mBez) && (S.ui.mOnly !== "hoch" || x.hoch));
+  const rankHTML = rk.length ? rk.map((x, i) => {
+    const key = "mg:" + x.st.id;
+    return `<details class="mrow" data-k="${esc(key)}" ${S.ui.open[key] ? "open" : ""}>
+      <summary><span class="rk mono">${i + 1}</span>
+        <span style="min-width:0"><b class="st-name" style="font-size:15px">${esc(x.st.name)}</b><br><span class="st-sub">${esc([x.st.nr, x.st.bezirk, x.st.techniker].filter(Boolean).join(" · "))}</span></span>
+        <span class="mcounts">${x.hoch ? `<span class="chip bad">${x.hoch} dringend</span>` : ""}${x.mittel ? `<span class="chip warn">${x.mittel} mittel</span>` : ""}${x.gering ? `<span class="chip brand">${x.gering} gering</span>` : ""}<span class="mtotal mono">${x.n}</span>${ic("chevron")}</span></summary>
+      <div class="tbl-wrap" style="border-top:1px solid var(--line)">${repairTable(x.list, false)}</div>
+      <div class="row-flex" style="padding:10px 14px"><button class="btn sm" data-act="open-station" data-id="${esc(x.st.id)}" data-tab="insp" data-year="${esc(x.list[0].ins.jahr)}">Zur Station</button></div>
+    </details>`;
+  }).join("") : `<div class="empty">${ic("check")}<b>${rank.length ? "Keine Station in dieser Auswahl" : "Keine offenen Mängel"}</b></div>`;
+
+  // 2) Fortschritt je Netzbezirk
+  const byBez = {};
+  rows.forEach((r) => { const b = r.st.bezirk || "ohne Bezirk"; (byBez[b] = byBez[b] || []).push(r); });
+  const rankBy = {}; rank.forEach((x) => { const b = x.st.bezirk || "ohne Bezirk"; rankBy[b] = rankBy[b] || { n: 0, h: 0 }; rankBy[b].n += x.n; rankBy[b].h += x.hoch; });
+  const bezRows = Object.entries(byBez).sort((a, b) => a[0].localeCompare(b[0], "de")).map(([bz, rs]) => {
     const n = rs.length, c = (f) => rs.filter(f).length;
-    const a = c((r) => r.abg), d = c((r) => r.state === "done" && !r.abg), w = c((r) => r.state === "wip"), u = c((r) => r.state === "due"), fr = n - c((r) => r.state === "none"), o = c((r) => r.over);
+    const d = c((r) => r.state === "done"), w = c((r) => r.state === "wip"), u = c((r) => r.state === "due"), fr = n - c((r) => r.state === "none"), o = c((r) => r.over);
+    const techs = [...new Set(rs.map((r) => r.st.techniker).filter(Boolean))];
     const seg = (cls, x) => x ? `<i class="${cls}" style="width:${x / n * 100}%" title="${x}"></i>` : "";
-    return `<tr><td><button class="linkbtn" data-act="p-tech" data-v="${esc(t)}">${esc(t)}</button></td><td class="num">${n}</td><td class="num">${fr}</td><td class="num">${w}</td><td class="num">${a + d}</td><td class="num">${a}</td><td class="num">${o ? `<span class="chip bad">${o}</span>` : "–"}</td><td class="num">${openByTech[t] || "–"}</td>
-      <td style="min-width:140px"><div class="stack" role="img" aria-label="${a} abgenommen, ${d} erledigt, ${w} in Arbeit, ${u} freigegeben von ${n}">${seg("s-abg", a)}${seg("s-done", d)}${seg("s-wip", w)}${seg("s-due", u)}</div></td></tr>`;
+    const m = rankBy[bz];
+    return `<tr><td><button class="linkbtn" data-act="p-bez" data-v="${esc(bz)}">${esc(bz)}</button></td><td>${esc(techs.join(", ") || "–")}</td><td class="num">${n}</td><td class="num">${fr}</td><td class="num">${w}</td><td class="num">${d}</td><td class="num">${o ? `<span class="chip bad">${o}</span>` : "–"}</td>
+      <td class="num">${m ? `${m.n}${m.h ? ` <span class="chip bad">${m.h}</span>` : ""}` : "–"}</td>
+      <td style="min-width:140px"><div class="stack" role="img" aria-label="${d} erledigt, ${w} in Arbeit, ${u} freigegeben von ${n}">${seg("s-done", d)}${seg("s-wip", w)}${seg("s-due", u)}</div></td></tr>`;
   }).join("");
 
-  // Freigabe-Liste
-  const techs = techList(); const bezirke = [...new Set(rows.map((r) => r.st.bezirk).filter(Boolean))].sort();
+  // 3) Freigabe-Liste
+  const techs = techList();
   const vis = rows.filter((r) => (!S.ui.pTech || r.st.techniker === S.ui.pTech) && (!S.ui.pBez || r.st.bezirk === S.ui.pBez)
     && (S.ui.pShow === "alle" || (S.ui.pShow === "offen" ? r.state === "none" : S.ui.pShow === "frei" ? r.state !== "none" : r.over)));
   S.ui.pVisible = vis.map((r) => r.st.id);
   const selN = [...S.ui.sel].filter((id) => S.ui.pVisible.includes(id)).length;
   const allOn = vis.length && vis.every((r) => S.ui.sel.has(r.st.id));
-  const stChip = (r) => r.abg ? `<span class="chip ok">abgenommen</span>` : r.state === "done" ? `<span class="chip ok">erledigt</span>` : r.state === "wip" ? `<span class="chip warn">in Arbeit ${r.stat.answered}/${r.stat.total}</span>` : r.state === "due" ? `<span class="chip brand">freigegeben</span>` : `<span class="chip">nicht freigegeben</span>`;
+  const stChip = (r) => r.state === "done" ? `<span class="chip ok">erledigt</span>` : r.state === "wip" ? `<span class="chip warn">in Arbeit ${r.stat.answered}/${r.stat.total}</span>` : r.state === "due" ? `<span class="chip brand">freigegeben</span>` : `<span class="chip">nicht freigegeben</span>`;
   const listRows = vis.map((r) => `<tr>
     <td><input type="checkbox" id="ps-${esc(r.st.id)}" data-sel="${esc(r.st.id)}" ${S.ui.sel.has(r.st.id) ? "checked" : ""} aria-label="${esc(r.st.name)} auswählen" ${r.state === "done" ? "disabled" : ""}></td>
     <td><button class="linkbtn" data-act="open-station" data-id="${esc(r.st.id)}" data-tab="insp" data-year="${Y}">${esc(r.st.name)}</button></td>
     <td class="mono">${esc(r.st.nr || "")}</td><td>${esc(r.st.bezirk || "")}</td><td>${esc(r.st.techniker || "–")}</td>
     <td>${stChip(r)}${r.over ? ` <span class="chip bad">überfällig</span>` : ""}</td><td class="num">${r.f && r.f.frist ? fmtDate(r.f.frist) : "–"}</td></tr>`).join("");
 
-  const pendingHTML = pending.length ? pending.map((r) => `<div>
-      <span class="t">${fmtDate(r.ins.closedAt || r.ins.datum).slice(0, 6)}</span>
-      <span style="min-width:0"><button class="linkbtn" data-act="open-station" data-id="${esc(r.st.id)}" data-tab="insp" data-year="${Y}">${esc(r.st.name)}</button><br>
-      <span class="muted" style="font-size:13px">${esc(r.ins.pruefer || r.st.techniker || "")} · ${r.stat.defects} Mängel${r.stat.open ? ` (${r.stat.open} offen)` : ""}</span>
-      <span class="row-flex" style="margin-top:6px"><button class="btn sm primary" data-act="p-abnahme" data-id="${esc(r.st.id)}" data-year="${Y}">${ic("check", "sm")}Abnehmen</button><button class="btn sm" data-act="p-report" data-id="${esc(r.st.id)}" data-year="${Y}">${ic("download", "sm")}Prüfbericht</button></span></span></div>`).join("")
-    : `<div class="empty" style="display:grid">${ic("check")}<span>Nichts zur Abnahme offen.</span></div>`;
   const nowHTML = nowIn.length ? nowIn.map((e) => { const st = S.data.stations[e.sid]; return `<div><span class="t">seit ${esc(e.von)}</span><span><span class="pulse"></span> <b>${esc(e.name)}</b>${e.firma ? ` <span class="muted">(${esc(e.firma)})</span>` : ""}<br><button class="linkbtn" data-act="open-station" data-id="${esc(e.sid)}">${esc(st ? st.name : e.sid)}</button> <span class="muted">· ${esc(e.grund)}</span></span></div>`; }).join("")
     : `<div class="empty" style="display:grid"><span>Gerade ist niemand in einer Station eingetragen.</span></div>`;
   const feedHTML = logs.slice(0, 10).map((e) => { const st = S.data.stations[e.sid]; return `<div><span class="t">${fmtDate(e.datum).slice(0, 6)} ${esc(e.von)}</span><span style="min-width:0"><b>${esc(e.name)}</b> · ${esc(e.grund)}<br><button class="linkbtn" data-act="open-station" data-id="${esc(e.sid)}">${esc(st ? st.name : e.sid)}</button>${e.text ? `<br><span class="muted" style="font-size:13px">${esc(e.text.length > 90 ? e.text.slice(0, 90) + " …" : e.text)}</span>` : ""}</span></div>`; }).join("")
     || `<div class="empty" style="display:grid"><span>Noch keine Einträge.</span></div>`;
-  const hochHTML = hoch.slice(0, 8).map((d) => `<div><span class="t">${esc(d.ins.jahr)}</span><span style="min-width:0"><button class="linkbtn" data-act="open-station" data-id="${esc(d.st.id)}" data-tab="insp" data-year="${esc(d.ins.jahr)}">${esc(d.st.name)}</button> · ${esc(d.it.label)}<br><span class="muted" style="font-size:13px">${esc(d.r.note || "")}</span></span></div>`).join("")
-    || `<div class="empty" style="display:grid">${ic("check")}<span>Keine dringenden Mängel offen.</span></div>`;
 
   return `<section class="hello row-flex" style="justify-content:space-between;align-items:end">
-      <div><h1>Planung</h1><p class="muted">Übersicht für den Betriebsplaner – Inspektionen freigeben, Fortschritt verfolgen, abnehmen.</p></div>
+      <div><h1>Planung</h1><p class="muted">Übersicht für den Betriebsplaner – Mängel im Blick, Inspektionen freigeben, Fortschritt je Netzbezirk.</p></div>
       <div class="row-flex"><div class="seg" role="group" aria-label="Jahr">${[YEAR, YEAR + 1].map((y) => `<button data-act="p-year" data-v="${y}" aria-pressed="${y === Y}">${y}</button>`).join("")}</div>
       <button class="btn" data-act="p-export">${ic("download")}Inspektionsstand (CSV)</button></div>
     </section>
     <section class="kpis">
-      <div class="card kpi"><span class="label">Freigegeben</span><span class="big">${frei}<small> / ${total}</small></span><div class="bar"><i style="width:${pct(frei, total)}%;background:var(--brand)"></i></div><span class="hint">${total - frei} Stationen noch nicht freigegeben</span></div>
+      <div class="card kpi ${hochSt ? "alert" : ""}"><span class="label">Stationen mit dringenden Mängeln</span><span class="big">${hochSt}</span><span class="hint">${hochN} dringende Mängel offen</span></div>
+      <div class="card kpi"><span class="label">Offene Mängel</span><span class="big">${openN}</span><span class="hint">in ${rank.length} Stationen</span></div>
+      <div class="card kpi"><span class="label">Freigegeben ${Y}</span><span class="big">${frei}<small> / ${total}</small></span><div class="bar"><i style="width:${pct(frei, total)}%;background:var(--brand)"></i></div><span class="hint">${total - frei} noch nicht freigegeben</span></div>
       <div class="card kpi"><span class="label">Erledigt</span><span class="big">${done}<small> / ${frei}</small></span><div class="bar"><i style="width:${pct(done, frei)}%"></i></div><span class="hint">${wip} in Arbeit · ${pct(done, frei)} %</span></div>
-      <div class="card kpi ${pending.length ? "live" : ""}"><span class="label">Zur Abnahme</span><span class="big">${pending.length}</span><span class="hint">${abg} bereits abgenommen</span></div>
-      <div class="card kpi ${over ? "alert" : ""}"><span class="label">Überfällig</span><span class="big">${over}</span><span class="hint">Frist überschritten, nicht erledigt</span></div>
-      <div class="card kpi ${hoch.length ? "alert" : ""}"><span class="label">Offene Mängel</span><span class="big">${defects.length}</span><span class="hint">${hoch.length} davon dringend</span></div>
-      <div class="card kpi ${nowIn.length ? "live" : ""}"><span class="label">Jetzt in Station</span><span class="big">${nowIn.length}</span><span class="hint">heute eingetragen, ohne Abfahrt</span></div>
+      <div class="card kpi ${over ? "alert" : ""}"><span class="label">Überfällig</span><span class="big">${over}</span><span class="hint">Frist überschritten</span></div>
+      <div class="card kpi ${nowIn.length ? "live" : ""}"><span class="label">Jetzt in Station</span><span class="big">${nowIn.length}</span><span class="hint">ohne Abfahrt eingetragen</span></div>
     </section>
     <div class="pgrid">
       <div>
         <section class="card" style="overflow:hidden">
-          <div class="panel-h"><h2>Fortschritt je Netztechniker</h2><span class="muted" style="font-size:13px">Inspektion ${Y}</span></div>
-          <div class="tbl-wrap"><table><thead><tr><th>Netztechniker</th><th class="num">Stat.</th><th class="num">Freig.</th><th class="num">In Arbeit</th><th class="num">Erledigt</th><th class="num">Abgen.</th><th class="num">Überf.</th><th class="num">Mängel</th><th>Fortschritt</th></tr></thead><tbody>${techRows}</tbody></table></div>
-          <div class="plegend"><span><i class="dot" style="background:var(--ok)"></i>abgenommen</span><span><i class="dot" style="background:color-mix(in srgb, var(--ok) 45%, var(--surface))"></i>erledigt</span><span><i class="dot" style="background:var(--warn)"></i>in Arbeit</span><span><i class="dot" style="background:var(--brand);opacity:.55"></i>freigegeben</span><span><i class="dot" style="background:var(--surface-2);border:1px solid var(--line)"></i>nicht freigegeben</span></div>
+          <div class="panel-h"><div><h2>Stationen nach Mängeln</h2><span class="muted" style="font-size:13px">Dringende zuerst, dann nach Anzahl offener Mängel</span></div>
+            <button class="btn sm" data-act="exp-rank" ${rk.length ? "" : "disabled"}>${ic("download", "sm")}Mängelliste (CSV)</button></div>
+          <div class="pbar">
+            <label class="field"><span>Netzbezirk</span><select id="m-bez" data-bind="mBez"><option value="">Alle</option>${bezirke.map((b) => `<option ${S.ui.mBez === b ? "selected" : ""}>${esc(b)}</option>`).join("")}</select></label>
+            <div class="seg" role="group" aria-label="Mängel"><button data-act="m-only" data-v="alle" aria-pressed="${S.ui.mOnly !== "hoch"}">Alle Mängel</button><button data-act="m-only" data-v="hoch" aria-pressed="${S.ui.mOnly === "hoch"}">Nur dringende</button></div>
+          </div>
+          <div class="mrank">${rankHTML}</div>
+          <div class="plegend"><span>${rk.length} Stationen · Station antippen zeigt die Mängel, dort auch als erledigt abhaken</span></div>
+        </section>
+        <section class="card" style="overflow:hidden">
+          <div class="panel-h"><h2>Fortschritt je Netzbezirk</h2><span class="muted" style="font-size:13px">Inspektion ${Y}</span></div>
+          <div class="tbl-wrap"><table><thead><tr><th>Bezirk</th><th>Netztechniker</th><th class="num">Stat.</th><th class="num">Freig.</th><th class="num">In Arbeit</th><th class="num">Erledigt</th><th class="num">Überf.</th><th class="num">Mängel</th><th>Fortschritt</th></tr></thead><tbody>${bezRows}</tbody></table></div>
+          <div class="plegend"><span><i class="dot" style="background:var(--ok)"></i>erledigt</span><span><i class="dot" style="background:var(--warn)"></i>in Arbeit</span><span><i class="dot" style="background:var(--brand);opacity:.55"></i>freigegeben</span><span><i class="dot" style="background:var(--surface-2);border:1px solid var(--line)"></i>nicht freigegeben</span><span>Mängel: offen, rot = dringend</span></div>
         </section>
         <section class="card" style="overflow:hidden">
           <div class="panel-h"><h2>Inspektionen freigeben</h2>
             <div class="seg" role="group" aria-label="Anzeige">${[["offen", "Nicht freigegeben"], ["frei", "Freigegeben"], ["over", "Überfällig"], ["alle", "Alle"]].map(([k, l]) => `<button data-act="p-show" data-v="${k}" aria-pressed="${S.ui.pShow === k}">${l}</button>`).join("")}</div></div>
           <div class="pbar">
-            <label class="field"><span>Netztechniker</span><select id="p-tech" data-bind="pTech"><option value="">Alle</option>${techs.map(([t, n]) => `<option value="${esc(t)}" ${S.ui.pTech === t ? "selected" : ""}>${esc(t)} (${n})</option>`).join("")}</select></label>
             <label class="field"><span>Netzbezirk</span><select id="p-bez" data-bind="pBez"><option value="">Alle</option>${bezirke.map((b) => `<option ${S.ui.pBez === b ? "selected" : ""}>${esc(b)}</option>`).join("")}</select></label>
+            <label class="field"><span>Netztechniker</span><select id="p-tech" data-bind="pTech"><option value="">Alle</option>${techs.map(([t, n]) => `<option value="${esc(t)}" ${S.ui.pTech === t ? "selected" : ""}>${esc(t)} (${n})</option>`).join("")}</select></label>
             <label class="field"><span>Fällig bis</span><input id="p-frist" type="date" data-bind="pFrist" value="${esc(S.ui.pFrist)}"></label>
             <div class="row-flex"><button class="btn primary" data-act="p-release" ${selN ? "" : "disabled"}>${ic("check")}${selN ? selN + " " : ""}freigeben</button><button class="btn" data-act="p-revoke" ${selN ? "" : "disabled"}>zurückziehen</button></div>
           </div>
@@ -1142,19 +1181,22 @@ function viewPlaner() {
         </section>
       </div>
       <div>
-        <section class="card" style="overflow:hidden"><div class="panel-h"><h2>Zur Abnahme</h2><span class="chip ${pending.length ? "warn" : ""}">${pending.length}</span></div><div class="feed">${pendingHTML}</div></section>
         <section class="card" style="overflow:hidden"><div class="panel-h"><h2>Jetzt in Station</h2>${nowIn.length ? `<span class="pulse"></span>` : ""}</div><div class="feed">${nowHTML}</div></section>
-        <section class="card" style="overflow:hidden"><div class="panel-h"><h2>Dringende Mängel</h2><button class="btn ghost sm" data-act="go-maengel">Alle Mängel</button></div><div class="feed">${hochHTML}</div></section>
         <section class="card" style="overflow:hidden"><div class="panel-h"><h2>Letzte Einträge</h2></div><div class="feed">${feedHTML}</div></section>
       </div>
     </div>`;
 }
+function exportRanking() {
+  const rk = defectRanking().filter((x) => (!S.ui.mBez || x.st.bezirk === S.ui.mBez) && (S.ui.mOnly !== "hoch" || x.hoch));
+  const list = rk.flatMap((x) => x.list.filter((d) => S.ui.mOnly !== "hoch" || d.r.prio === "hoch"));
+  offerFile(`Maengel_nach_Stationen_${S.ui.mBez ? slug(S.ui.mBez) + "_" : ""}${todayISO()}.csv`, toCSV(repairRows(list)), "text/csv");
+}
 function exportPlan() {
   const Y = Number(S.ui.pYear) || YEAR;
   const lbl = { none: "nicht freigegeben", due: "freigegeben", wip: "in Arbeit", done: "erledigt" };
-  const out = [["Station", "Stationsnr.", "Gemeinde", "Netzbezirk", "Netztechniker", "Status", "Fällig bis", "Freigegeben am", "Inspektionsdatum", "Prüfer", "Prüfpunkte bewertet", "Mängel", "davon offen", "Abgenommen am", "Abgenommen von", "Überfällig"]];
-  planRows(Y).forEach((r) => out.push([r.st.name, r.st.nr || "", r.st.ort || "", r.st.bezirk || "", r.st.techniker || "", r.abg ? "abgenommen" : lbl[r.state], r.f && r.f.frist ? fmtDate(r.f.frist) : "", r.f && r.f.at ? fmtDate(r.f.at) : "",
-    r.ins ? fmtDate(r.ins.datum) : "", r.ins ? r.ins.pruefer || "" : "", r.stat ? `${r.stat.answered}/${r.stat.total}` : "", r.stat ? r.stat.defects : "", r.stat ? r.stat.open : "", r.abg ? fmtDate(r.f.abnahmeAt) : "", r.abg ? r.f.abnahmeBy || "" : "", r.over ? "ja" : ""]));
+  const out = [["Station", "Stationsnr.", "Gemeinde", "Netzbezirk", "Netztechniker", "Status", "Fällig bis", "Freigegeben am", "Inspektionsdatum", "Prüfer", "Prüfpunkte bewertet", "Mängel", "davon offen", "Überfällig"]];
+  planRows(Y).forEach((r) => out.push([r.st.name, r.st.nr || "", r.st.ort || "", r.st.bezirk || "", r.st.techniker || "", lbl[r.state], r.f && r.f.frist ? fmtDate(r.f.frist) : "", r.f && r.f.at ? fmtDate(r.f.at) : "",
+    r.ins ? fmtDate(r.ins.datum) : "", r.ins ? r.ins.pruefer || "" : "", r.stat ? `${r.stat.answered}/${r.stat.total}` : "", r.stat ? r.stat.defects : "", r.stat ? r.stat.open : "", r.over ? "ja" : ""]));
   offerFile(`Inspektionsstand_${Y}_${todayISO()}.csv`, toCSV(out), "text/csv");
 }
 
@@ -1231,7 +1273,9 @@ document.addEventListener("click", async (ev) => {
     case "go-maengel": go({ name: "maengel" }); break;
     case "go-planer": go({ name: "planer" }); break;
     case "p-year": S.ui.pYear = Number(v); S.ui.sel = new Set(); render(); break;
-    case "p-tech": S.ui.pTech = v; S.ui.pShow = "alle"; S.ui.sel = new Set(); render(); break;
+    case "p-bez": S.ui.pBez = v === "ohne Bezirk" ? "" : v; S.ui.pTech = ""; S.ui.pShow = "alle"; S.ui.sel = new Set(); render(); break;
+    case "m-only": S.ui.mOnly = v; render(); break;
+    case "exp-rank": exportRanking(); break;
     case "p-show": S.ui.pShow = v; S.ui.sel = new Set(); render(); break;
     case "p-selall": {
       const vis = S.ui.pVisible || []; const allOn = vis.length && vis.every((id) => S.ui.sel.has(id));
@@ -1250,16 +1294,6 @@ document.addEventListener("click", async (ev) => {
       saveFg(S.ui.pYear, (m) => ids.forEach((id) => { delete m[id]; }));
       S.ui.sel = new Set(); toast(`${ids.length} Freigaben zurückgezogen`); break;
     }
-    case "p-abnahme": {
-      const y = Number(el.dataset.year) || S.ui.pYear;
-      saveFg(y, (m) => { m[id] = Object.assign({}, m[id] || {}, { abgenommen: true, abnahmeAt: todayISO(), abnahmeBy: S.myName || "Betriebsplaner" }); });
-      toast(`${S.data.stations[id] ? S.data.stations[id].name : "Inspektion"} abgenommen`); break;
-    }
-    case "p-abnahme-undo": {
-      const y = Number(el.dataset.year) || S.ui.pYear;
-      saveFg(y, (m) => { if (m[id]) { delete m[id].abgenommen; delete m[id].abnahmeAt; delete m[id].abnahmeBy; } }); break;
-    }
-    case "p-report": { const ins = inspFor(id, Number(el.dataset.year)); if (ins) exportInspHTML(S.data.stations[id], ins); break; }
     case "p-export": exportPlan(); break;
     case "fg-now": {
       saveFg(S.view.year, (m) => { m[st.id] = Object.assign({}, m[st.id] || {}, { frist: `${S.view.year}-12-31`, at: todayISO(), by: S.myName || "Betriebsplaner" }); });
@@ -1360,7 +1394,7 @@ document.addEventListener("change", async (ev) => {
   if (t.dataset.mess && ins) { put("inspections", ins.id, ins); return; }
   if (t.dataset.caption) { const p = S.data.photos[t.dataset.caption]; p.caption = t.value; put("photos", p.id, p, { quiet: true }); return; }
   if (t.dataset.bind && t.type === "checkbox") { setPath(S.ui, t.dataset.bind, t.checked); }
-  if (t.dataset.bind && t.tagName === "SELECT") { setPath(S.ui, t.dataset.bind, t.value); if (t.dataset.bind.startsWith("p")) { S.ui.sel = new Set(); render(); } }
+  if (t.dataset.bind && t.tagName === "SELECT") { setPath(S.ui, t.dataset.bind, t.value); if (t.dataset.bind.startsWith("p") || t.dataset.bind === "mBez") { S.ui.sel = new Set(); render(); } }
   if (t.dataset.sel) { if (t.checked) S.ui.sel.add(t.dataset.sel); else S.ui.sel.delete(t.dataset.sel); render(); return; }
   if (t.id === "tech") { setTech(t.value); }
 });
