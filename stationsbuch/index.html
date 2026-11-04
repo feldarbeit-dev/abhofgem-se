@@ -1,0 +1,1139 @@
+<title>StationsBuch</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: mobile-first Feldwerkzeug. Dunkle Kopfleiste mit Warnschild-Streifen, darunter eine Spalte (max. 980px):
+   Stationsliste → Station mit Reitern Stationsbuch · Fotos · Inspektion · Stammdaten; eigene Seite für offene Mängel. */
+:root {
+  --bg: #eef1f5;
+  --surface: #ffffff;
+  --surface-2: #f5f7fa;
+  --line: #d6dde6;
+  --fg: #14202c;
+  --muted: #586777;
+  --brand: #1d4e89;
+  --brand-soft: #e2ebf6;
+  --signal: #f2b705;
+  --signal-ink: #14202c;
+  --head: #14202c;
+  --head-fg: #eef2f7;
+  --head-muted: #9fb0c3;
+  --ok: #1d8049;
+  --ok-soft: #e1f2e8;
+  --warn: #a96400;
+  --warn-soft: #fcefd8;
+  --bad: #c22929;
+  --bad-soft: #fbe6e6;
+  --shadow: 0 1px 2px rgba(20, 32, 44, .06), 0 4px 14px rgba(20, 32, 44, .06);
+  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-ui: "Barlow", "Segoe UI", system-ui, sans-serif;
+  --font-data: "JetBrains Mono", ui-monospace, "Consolas", monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e141b; --surface: #17202a; --surface-2: #1d2833; --line: #2b3845; --fg: #e6ecf2; --muted: #93a2b3;
+    --brand: #6ea9ee; --brand-soft: #172f4c; --signal: #f2b705; --signal-ink: #14202c; --head: #080c11; --head-fg: #eef2f7; --head-muted: #8d9db0;
+    --ok: #4cc27f; --ok-soft: #12301f; --warn: #f0a33c; --warn-soft: #36270f; --bad: #ff7070; --bad-soft: #3a1919;
+    --shadow: 0 1px 2px rgba(0,0,0,.4); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e141b; --surface: #17202a; --surface-2: #1d2833; --line: #2b3845; --fg: #e6ecf2; --muted: #93a2b3;
+  --brand: #6ea9ee; --brand-soft: #172f4c; --signal: #f2b705; --signal-ink: #14202c; --head: #080c11; --head-fg: #eef2f7; --head-muted: #8d9db0;
+  --ok: #4cc27f; --ok-soft: #12301f; --warn: #f0a33c; --warn-soft: #36270f; --bad: #ff7070; --bad-soft: #3a1919;
+  --shadow: 0 1px 2px rgba(0,0,0,.4); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); }
+body { color: var(--fg); font-family: var(--font-ui); font-size: 15px; line-height: 1.45; -webkit-text-size-adjust: 100%; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--head); }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+p { margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.mono { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.label { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; }
+.icon { width: 20px; height: 20px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.icon.sm { width: 16px; height: 16px; }
+
+/* Kopf */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--head); color: var(--head-fg); }
+.top-in { max-width: 980px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 10px; display: flex; align-items: center; gap: 12px; }
+.top::after { content: ""; display: block; height: 5px; background: repeating-linear-gradient(-45deg, var(--signal) 0 10px, var(--head) 10px 20px); }
+.brand { display: flex; align-items: center; gap: 8px; text-decoration: none; color: inherit; background: none; border: 0; padding: 0; }
+.brand-mark { width: 30px; height: 30px; border-radius: 7px; background: var(--signal); display: grid; place-items: center; color: var(--signal-ink); }
+.brand-mark svg { width: 20px; height: 20px; fill: currentColor; stroke: none; }
+.brand-name { font-family: var(--font-display); font-size: 22px; letter-spacing: .02em; font-weight: 700; }
+.top-nav { margin-left: auto; display: flex; gap: 4px; }
+.top-nav button { background: transparent; border: 0; color: var(--head-muted); padding: 8px 10px; border-radius: 8px; font-weight: 600; display: flex; gap: 6px; align-items: center; }
+.top-nav button[aria-current="page"] { color: var(--head-fg); background: rgba(255,255,255,.08); }
+.top-nav .count { background: var(--bad); color: #fff; border-radius: 999px; font-size: 12px; padding: 0 7px; line-height: 18px; }
+
+.wrap { max-width: 980px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 18px 64px; display: grid; gap: 18px; }
+.wrap > * { min-width: 0; }
+
+/* Allgemeine Bausteine */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); }
+.pad { padding: 16px; }
+.row-flex { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 0 16px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; text-decoration: none; color: var(--fg); }
+.btn:hover { border-color: var(--brand); }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+:root[data-theme="dark"] .btn.primary { color: #0b1520; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.primary { color: #0b1520; } }
+.btn.signal { background: var(--signal); border-color: var(--signal); color: var(--signal-ink); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--brand); padding-inline: 8px; }
+.btn.danger { color: var(--bad); border-color: var(--bad); background: transparent; }
+.btn.sm { min-height: 34px; padding: 0 12px; font-size: 14px; }
+.btn[disabled] { opacity: .45; cursor: not-allowed; }
+.chip { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 2px 10px; font-size: 13px; font-weight: 600; background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+.chip.ok { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+.chip.warn { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+.chip.bad { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
+.chip.brand { background: var(--brand-soft); color: var(--brand); border-color: transparent; }
+.notice { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; border-radius: var(--r); background: var(--warn-soft); color: var(--warn); font-size: 14px; }
+.notice b { color: inherit; }
+.notice .btn { margin-left: auto; }
+
+input[type=text], input[type=date], input[type=time], input[type=number], input[type=search], select, textarea {
+  width: 100%; min-height: 42px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+textarea { min-height: 76px; resize: vertical; }
+.field { display: grid; gap: 4px; min-width: 0; }
+.field > span { font-size: 13px; font-weight: 600; color: var(--muted); }
+.grid2 { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); }
+.check { display: flex; gap: 10px; align-items: center; font-weight: 500; }
+.check input { width: 20px; height: 20px; accent-color: var(--brand); }
+
+/* Übersicht */
+.hello h1 { font-family: var(--font-display); font-size: 30px; font-weight: 700; letter-spacing: .01em; }
+.stats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); }
+.stat { padding: 14px 16px; display: grid; gap: 6px; }
+.stat .big { font-family: var(--font-display); font-size: 34px; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat .big small { font-size: 18px; color: var(--muted); font-weight: 600; }
+.bar { height: 8px; border-radius: 99px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--ok); border-radius: 99px; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.toolbar .search { flex: 1 1 220px; position: relative; }
+.toolbar .search input { padding-left: 38px; }
+.toolbar .search .icon { position: absolute; left: 11px; top: 11px; color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: transparent; padding: 0 12px; min-height: 40px; font-weight: 600; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--brand-soft); color: var(--brand); }
+
+.stations { display: grid; }
+.st { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 12px 14px; border-top: 1px solid var(--line); background: none; border-left: 0; border-right: 0; border-bottom: 0; text-align: left; width: 100%; color: inherit; }
+.st:first-child { border-top: 0; }
+.st:hover { background: var(--surface-2); }
+.st-state { width: 38px; height: 38px; border-radius: 9px; display: grid; place-items: center; }
+.st-state.due { background: var(--surface-2); color: var(--muted); border: 1px dashed var(--line); }
+.st-state.wip { background: var(--warn-soft); color: var(--warn); }
+.st-state.done { background: var(--ok-soft); color: var(--ok); }
+.st-name { font-weight: 700; font-size: 16px; letter-spacing: .01em; overflow-wrap: anywhere; }
+.st-sub { font-size: 13px; color: var(--muted); }
+.st-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); padding: 10px 14px; border-top: 1px solid var(--line); }
+.legend span { display: inline-flex; gap: 6px; align-items: center; }
+.dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+/* Station */
+.crumbs { display: flex; gap: 6px; align-items: center; font-size: 14px; color: var(--muted); flex-wrap: wrap; }
+.crumbs button { background: none; border: 0; padding: 0; color: var(--brand); font-weight: 600; }
+.sthead { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: flex-end; justify-content: space-between; }
+.sthead h1 { font-family: var(--font-display); font-size: 34px; line-height: 1.05; font-weight: 700; letter-spacing: .015em; overflow-wrap: anywhere; }
+.facts { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; color: var(--muted); margin-top: 6px; }
+.facts b { color: var(--fg); font-weight: 600; }
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.tabs button { flex: none; background: none; border: 0; border-bottom: 3px solid transparent; padding: 10px 14px; font-weight: 600; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+.tabs button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--signal); }
+.tabs .n { font-size: 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 99px; padding: 0 7px; color: var(--muted); }
+
+/* Stationsbuch */
+.entries { display: grid; gap: 0; }
+.month { padding: 14px 16px 6px; }
+.entry { display: grid; grid-template-columns: 64px 1fr; gap: 14px; padding: 12px 16px; border-top: 1px solid var(--line); }
+.entry .when { text-align: center; }
+.entry .day { font-family: var(--font-display); font-size: 28px; line-height: 1; font-weight: 700; }
+.entry .wd { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.entry .who { font-weight: 700; }
+.entry .txt { margin-top: 4px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.entry .meta { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: 13px; color: var(--muted); margin-top: 6px; }
+.reasons { display: flex; flex-wrap: wrap; gap: 6px; }
+.reasons button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 12px; font-weight: 600; font-size: 14px; color: var(--muted); }
+.reasons button[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: #fff; }
+:root[data-theme="dark"] .reasons button[aria-pressed="true"] { color: #0b1520; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .reasons button[aria-pressed="true"] { color: #0b1520; } }
+.formcard { display: grid; gap: 14px; }
+.formcard h2 { font-family: var(--font-display); font-size: 22px; font-weight: 700; }
+
+/* Fotos */
+.folders { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); }
+.folder { padding: 0; overflow: hidden; text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: var(--r); color: inherit; display: grid; }
+.folder .cover { aspect-ratio: 4/3; max-width: 100%; background: var(--surface-2); display: grid; place-items: center; color: var(--muted); overflow: hidden; }
+.folder .cover img { width: 100%; height: 100%; object-fit: cover; }
+.folder .cover .icon { width: 34px; height: 34px; stroke-width: 1.4; }
+.folder .fn { padding: 10px 12px; display: flex; justify-content: space-between; gap: 8px; font-weight: 600; }
+.photos { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 140px), 1fr)); }
+.photo { padding: 0; border: 0; border-radius: 8px; overflow: hidden; aspect-ratio: 1; max-width: 100%; background: var(--surface-2); position: relative; }
+.photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo .cap { position: absolute; inset: auto 0 0; padding: 14px 8px 6px; font-size: 12px; color: #fff; text-align: left; background: linear-gradient(transparent, rgba(0,0,0,.65)); }
+.upload { position: relative; overflow: hidden; }
+.upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+/* Inspektion */
+.insp-head { display: grid; gap: 14px; }
+.progress-line { display: flex; gap: 12px; align-items: center; }
+.progress-line .bar { flex: 1; }
+.groups { display: grid; gap: 10px; }
+.group { overflow: hidden; }
+.group > summary { list-style: none; display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; align-items: center; padding: 12px 14px; cursor: pointer; }
+.group > summary::-webkit-details-marker { display: none; }
+.gicon { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand); }
+.gt { font-weight: 700; overflow-wrap: anywhere; }
+.gs { font-size: 13px; color: var(--muted); }
+.item { display: grid; gap: 10px; padding: 12px 14px; border-top: 1px solid var(--line); }
+.item-top { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.item-name { font-weight: 600; flex: 1 1 200px; min-width: 0; }
+.tri { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.tri button { border: 0; border-left: 1px solid var(--line); background: var(--surface); min-height: 38px; min-width: 64px; padding: 0 10px; font-weight: 700; font-size: 13px; color: var(--muted); display: inline-flex; gap: 4px; align-items: center; justify-content: center; }
+.tri button:first-child { border-left: 0; }
+.tri button.ok[aria-pressed="true"] { background: var(--ok); color: #fff; }
+.tri button.m[aria-pressed="true"] { background: var(--bad); color: #fff; }
+.tri button.na[aria-pressed="true"] { background: var(--muted); color: var(--surface); }
+.defect { display: grid; gap: 10px; padding: 12px; border-radius: 8px; background: var(--bad-soft); }
+.prio { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.prio button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 12px; font-weight: 600; font-size: 13px; color: var(--muted); }
+.prio button[aria-pressed="true"].hoch { background: var(--bad); border-color: var(--bad); color: #fff; }
+.prio button[aria-pressed="true"].mittel { background: var(--warn); border-color: var(--warn); color: #fff; }
+.prio button[aria-pressed="true"].gering { background: var(--brand); border-color: var(--brand); color: #fff; }
+.thumbs { display: flex; gap: 6px; flex-wrap: wrap; }
+.thumbs button { padding: 0; border: 0; width: 56px; height: 56px; border-radius: 6px; overflow: hidden; background: var(--surface-2); }
+.thumbs img { width: 100%; height: 100%; object-fit: cover; }
+
+.mess { display: grid; gap: 16px; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); align-items: stretch; }
+@media (max-width: 640px) { .mess { grid-template-columns: 1fr; } }
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; background: var(--surface-2); }
+td.num, th.num { text-align: right; font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.mess-tbl input { min-height: 36px; padding: 4px 8px; text-align: right; font-family: var(--font-data); }
+.gauge { border-radius: var(--r); padding: 16px; display: grid; gap: 8px; align-content: center; justify-items: center; text-align: center; border: 1px solid var(--line); background: var(--surface-2); }
+.gauge svg { width: 160px; max-width: 100%; height: auto; }
+.gauge .pct { font-family: var(--font-display); font-size: 40px; font-weight: 700; line-height: 1; }
+.gauge.ok .pct { color: var(--ok); } .gauge.warn .pct { color: var(--warn); } .gauge.bad .pct { color: var(--bad); }
+.repair td .chip { font-size: 12px; }
+tr.done td { color: var(--muted); }
+tr.done td .what { text-decoration: line-through; }
+.empty { padding: 28px 16px; text-align: center; display: grid; gap: 10px; justify-items: center; color: var(--muted); }
+.empty .icon { width: 38px; height: 38px; stroke-width: 1.3; }
+.empty b { color: var(--fg); font-size: 16px; }
+
+/* Overlay */
+.sheet { position: fixed; inset: 0; z-index: 50; background: rgba(8, 12, 17, .72); display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.sheet-in { width: min(900px, 100%); max-height: 100%; overflow: auto; display: grid; gap: 12px; }
+.sheet-in img { width: 100%; max-height: 70vh; object-fit: contain; border-radius: 8px; background: #000; }
+.sheet-in.form { width: min(520px, 100%); }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 60; background: var(--head); color: var(--head-fg); padding: 10px 16px; border-radius: 10px; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,.25); max-width: calc(100% - 32px); }
+.loading { padding: 40px 16px; text-align: center; color: var(--muted); }
+@media (max-width: 520px) {
+  .brand-name { font-size: 20px; }
+  .top-nav .lbl { display: none; }
+  .sthead h1 { font-size: 28px; }
+  .entry { grid-template-columns: 48px 1fr; gap: 10px; }
+  .tri button { min-width: 56px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .st, .btn, .tri button { transition: background-color .12s, border-color .12s, color .12s; }
+}
+</style>
+
+<header class="top">
+  <div class="top-in">
+    <button class="brand" data-act="go-list" aria-label="StationsBuch – Stationsliste">
+      <span class="brand-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 5 13.2h5.6L9.3 22 19 9.8h-5.7z"/></svg></span>
+      <span class="brand-name">StationsBuch</span>
+    </button>
+    <nav class="top-nav" id="topnav"></nav>
+  </div>
+</header>
+<main class="wrap" id="app"><div class="loading">StationsBuch wird geladen …</div></main>
+<div id="overlay"></div>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+"use strict";
+/* ============================================================
+   StationsBuch – digitales Stationsbuch, Fotoordner und Jahresinspektion
+   Speicher: im claude.ai-Viewer gemeinsame Datenbank (db) + Foto-Ablage (assets);
+   als eigenständige Datei: localStorage + IndexedDB mit Beispieldaten.
+   ============================================================ */
+
+const YEAR = new Date().getFullYear();
+const REASONS = ["Inspektion", "Störung", "Wartung", "Schalthandlung", "Messung / Ablesung", "Bau / Umbau", "Reinigung", "Sonstiges"];
+const FOLDERS = ["Außenansicht", "MS-Anlage", "Transformator", "NS-Anlage", "Zähler & Datenkonzentrator", "Schaltplan & Beschriftung", "Mängel"];
+const PRIOS = [["hoch", "Dringend"], ["mittel", "Bis nächste Inspektion"], ["gering", "Beobachten"]];
+const PRIO_LABEL = Object.fromEntries(PRIOS);
+const PRIO_RANK = { hoch: 0, mittel: 1, gering: 2 };
+
+/* ---------- Icons ---------- */
+const ICONS = {
+  book: '<path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M4 21.5A2.5 2.5 0 0 0 6.5 24"/><path d="M8 7h8M8 11h6"/>',
+  camera: '<path d="M3 8h3.5L8 5.5h8L17.5 8H21v11H3z"/><circle cx="12" cy="13.5" r="3.6"/>',
+  clip: '<rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 4V2.8h6V4M9 11l2 2 4-4M9 17h6"/>',
+  sliders: '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  minus: '<path d="M6 12h12"/>',
+  alert: '<path d="M12 3 2 20h20z"/><path d="M12 10v4.5M12 17.5v.01"/>',
+  route: '<path d="M12 2 22 12 12 22 2 12z"/><path d="M9 14v-2.5h5M12.5 9l2 2.5-2 2.5"/>',
+  download: '<path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/>',
+  folder: '<path d="M3 6.5h6l2 2h10V19H3z"/>',
+  chevron: '<path d="m9 6 6 6-6 6"/>',
+  back: '<path d="m15 6-6 6 6 6"/>',
+  trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+  house: '<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10M10 20v-5h4v5"/>',
+  bolt: '<path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12z"/>',
+  bars: '<path d="M6 4v16M12 4v16M18 4v16M4 8h4M10 8h4M16 8h4"/>',
+  coil: '<rect x="7" y="3" width="10" height="18" rx="5"/><path d="M7 9h10M7 15h10"/>',
+  line: '<path d="M12 3v18M7 7h10M9 12h6"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/>',
+  amp: '<circle cx="12" cy="13" r="8"/><path d="m12 13 4-4M8 4.5 6.5 3M16 4.5 17.5 3"/>',
+  antenna: '<path d="M12 10v11M8.5 21h7M7.5 6.5a6.4 6.4 0 0 0 0 7M16.5 6.5a6.4 6.4 0 0 1 0 7M5 4a10 10 0 0 0 0 12M19 4a10 10 0 0 1 0 12"/><circle cx="12" cy="10" r="1.3"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>',
+  lock: '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+};
+const ic = (n, cls = "") => `<svg class="icon ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ""}</svg>`;
+
+/* ---------- Helfer ---------- */
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const slug = (s) => String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ß/g, "ss").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || uid();
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const pad2 = (n) => String(n).padStart(2, "0");
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+const nowHM = () => { const d = new Date(); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+const fmtDate = (iso) => { if (!iso) return "–"; const [y, m, d] = iso.slice(0, 10).split("-"); return `${d}.${m}.${y}`; };
+const WD = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+const MONTHS = ["Jänner", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+const ls = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
+};
+
+/* ---------- Zustand ---------- */
+const S = {
+  mode: "loading", // loading | db | local
+  data: { stations: {}, log: {}, photos: {}, inspections: {} },
+  db: null, assets: null, downloads: null, user: null, myName: "",
+  localPhotoURL: {},
+  readOnly: false,
+  view: { name: "list", sid: null, tab: "buch", folder: null, year: YEAR },
+  ui: { q: "", filter: "alle", logOpen: false, draft: null, mfilter: "offen", confirmDel: false, stDraft: null, newStation: null, lightbox: null, open: {} },
+};
+const COLS = ["stations", "log", "photos", "inspections"];
+
+/* ---------- Speicher ---------- */
+const LS_KEY = "stationsbuch.v1";
+function persistLocal() { if (S.mode === "local") ls.set(LS_KEY, S.data); }
+
+async function put(col, id, obj, { quiet = false } = {}) {
+  S.data[col][id] = obj;
+  if (!quiet) render();
+  if (S.mode === "db") {
+    try { await S.db.collection(col).doc(id).set(obj); }
+    catch (e) {
+      if (e && e.code === "invalid_argument" && !S.readOnly) { S.readOnly = true; render(); }
+      toast("Speichern fehlgeschlagen: " + (e && e.message || "unbekannt"));
+    }
+  } else persistLocal();
+}
+async function del(col, id) {
+  delete S.data[col][id];
+  render();
+  if (S.mode === "db") { try { await S.db.collection(col).doc(id).delete(); } catch (e) { toast("Löschen fehlgeschlagen: " + (e && e.message || "")); } }
+  else persistLocal();
+}
+
+/* IndexedDB für Fotos im lokalen Modus */
+const idb = {
+  _db: null,
+  open() {
+    if (this._db) return Promise.resolve(this._db);
+    return new Promise((res, rej) => {
+      try {
+        const r = indexedDB.open("stationsbuch", 1);
+        r.onupgradeneeded = () => r.result.createObjectStore("photos");
+        r.onsuccess = () => { this._db = r.result; res(r.result); };
+        r.onerror = () => rej(r.error);
+      } catch (e) { rej(e); }
+    });
+  },
+  async put(id, blob) { const db = await this.open(); return new Promise((res, rej) => { const t = db.transaction("photos", "readwrite"); t.objectStore("photos").put(blob, id); t.oncomplete = res; t.onerror = () => rej(t.error); }); },
+  async del(id) { const db = await this.open(); return new Promise((res) => { const t = db.transaction("photos", "readwrite"); t.objectStore("photos").delete(id); t.oncomplete = res; t.onerror = res; }); },
+  async all() {
+    const db = await this.open();
+    return new Promise((res) => {
+      const out = {}; const t = db.transaction("photos", "readonly"); const st = t.objectStore("photos");
+      const rq = st.openCursor();
+      rq.onsuccess = () => { const c = rq.result; if (c) { out[c.key] = c.value; c.continue(); } else res(out); };
+      rq.onerror = () => res(out);
+    });
+  },
+};
+
+function photoSrc(p) {
+  if (!p) return "";
+  if (p.demo) return demoImage(p.demo);
+  if (p.assetId) return "/_blob/" + p.assetId;
+  return S.localPhotoURL[p.id] || "";
+}
+
+async function compress(file) {
+  try {
+    const bmp = await createImageBitmap(file);
+    const max = 1600, r = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * r); c.height = Math.round(bmp.height * r);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    return await new Promise((res) => c.toBlob((b) => res(b || file), "image/jpeg", 0.82));
+  } catch { return file; }
+}
+
+async function addPhotos(files, sid, folder, extra = {}) {
+  const ids = [];
+  if (S.mode === "db" && !S.assets) { toast("Fotos hochladen ist für dich in diesem Stationsbuch nicht freigegeben."); return ids; }
+  toast(files.length > 1 ? `${files.length} Fotos werden gespeichert …` : "Foto wird gespeichert …");
+  for (const f of files) {
+    const blob = await compress(f);
+    const id = uid();
+    const doc = { id, sid, folder, caption: extra.caption || "", ts: new Date().toISOString(), by: S.myName || "", ...extra };
+    try {
+      if (S.mode === "db") { const r = await S.assets.upload(blob); doc.assetId = r.id; }
+      else { await idb.put(id, blob); S.localPhotoURL[id] = URL.createObjectURL(blob); }
+      await put("photos", id, doc, { quiet: true });
+      ids.push(id);
+    } catch (e) { toast("Foto konnte nicht gespeichert werden: " + (e && e.message || "")); }
+  }
+  render();
+  if (ids.length) toast(ids.length === 1 ? "Foto gespeichert" : `${ids.length} Fotos gespeichert`);
+  return ids;
+}
+async function removePhoto(id) {
+  const p = S.data.photos[id]; if (!p) return;
+  if (S.mode === "db" && p.assetId && S.assets) { try { await S.assets.delete(p.assetId); } catch {} }
+  if (S.mode === "local") { idb.del(id).catch(() => {}); }
+  // Verweise in Inspektionen entfernen
+  for (const ins of Object.values(S.data.inspections)) {
+    let changed = false;
+    for (const r of Object.values(ins.results || {})) if (r.photos && r.photos.includes(id)) { r.photos = r.photos.filter((x) => x !== id); changed = true; }
+    if (changed) put("inspections", ins.id, ins, { quiet: true });
+  }
+  await del("photos", id);
+}
+
+async function offerFile(filename, text, mime) {
+  if (S.downloads) {
+    try { await S.downloads.save({ filename, data: text }); toast("Datei gespeichert: " + filename); }
+    catch (e) { if (!e || e.code !== "declined") toast("Download nicht möglich (" + (e && e.code || "Fehler") + ")"); }
+    return;
+  }
+  if (window.claude && S.mode === "db") { toast("Download ist in dieser Ansicht nicht verfügbar."); return; }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type: mime }));
+  a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+/* ---------- Fachlogik ---------- */
+function template(st) {
+  const g = [];
+  g.push({ k: "bau", icon: "house", t: "Baulicher Teil", items: ["Mauerwerk / Box", "Dach", "Türen & Schlösser", "Lüftungsgitter", "Fundament & Umgebung", "Warn- & Hinweisschilder"] });
+  g.push({ k: "ms", icon: "bars", t: `MS-Anlage${st.ms ? " (" + st.ms + ")" : ""}`, items: ["Allgemeinzustand & Sauberkeit", "SF6-Druckanzeige", "Schaltgeräte & Antriebe", "Kurzschlussanzeiger", "Kabelendverschlüsse", "Spannungsprüfsystem"] });
+  (st.abgaenge || []).forEach((a) => g.push({ k: "lab-" + slug(a), icon: "line", t: `Leitungsabgang ${a}`, items: ["Lasttrennschalter", "Kabelendverschluss", "Beschriftung"] }));
+  g.push({ k: "trab", icon: "line", t: "Trafo-Abgang", items: ["HH-Sicherungen", "Lasttrennschalter", "Beschriftung"] });
+  g.push({ k: "tr", icon: "coil", t: `MS/NS-Transformator${st.trafoInv ? " (Inv. " + st.trafoInv + ")" : ""}`, items: ["Ölstand & Dichtheit", "Luftentfeuchter / Silikagel", "Thermometer & Schleppzeiger", "Erdung", "Geräusche / Vibration", "Ölauffangwanne"] });
+  g.push({ k: "ns", icon: "bars", t: "NS-Anlage", items: ["NH-Sicherungsleisten", "Sicherungseinsätze & Reserve", "Beschriftung der Abgänge", "Berührungsschutz", "PEN / Erdung"] });
+  g.push({ k: "allg", icon: "info", t: "Allgemeines", items: ["Erdungsanlage", "Schaltplan in der Station", "Sicherheitsausrüstung (Erdungsgarnitur, Handschuhe)", "Erste-Hilfe-Tafel & 5 Sicherheitsregeln", "Beleuchtung", "Stationsbuch geführt"] });
+  if (st.dk) g.push({ k: "dk", icon: "antenna", t: "Datenkonzentrator", items: ["Betriebsanzeige / LED", "Kommunikation (Mobilfunk)", "Gehäuse & Verkabelung"] });
+  return g.map((gr) => ({ ...gr, items: gr.items.map((label) => ({ key: gr.k + "/" + slug(label), label })) }));
+}
+function inspFor(sid, year) { return Object.values(S.data.inspections).find((i) => i.sid === sid && Number(i.jahr) === Number(year)); }
+function inspStats(ins, st) {
+  const groups = template(st);
+  let total = 0, answered = 0, defects = 0, open = 0;
+  for (const g of groups) for (const it of g.items) {
+    total++; const r = ins && ins.results && ins.results[it.key];
+    if (r && r.s) answered++;
+    if (r && r.s === "m") { defects++; if (!r.done) open++; }
+  }
+  const messDone = !!(ins && ins.mess && ins.mess.R && ins.mess.R.mw !== "" && ins.mess.R.mw != null);
+  return { total, answered, defects, open, messDone };
+}
+function stationState(st, year = YEAR) {
+  const ins = inspFor(st.id, year);
+  if (!ins) return "due";
+  return ins.status === "abgeschlossen" ? "done" : "wip";
+}
+function defectsAll() {
+  const out = [];
+  for (const ins of Object.values(S.data.inspections)) {
+    const st = S.data.stations[ins.sid]; if (!st) continue;
+    const groups = template(st);
+    for (const g of groups) for (const it of g.items) {
+      const r = ins.results && ins.results[it.key];
+      if (r && r.s === "m") out.push({ ins, st, g, it, r });
+    }
+  }
+  return out.sort((a, b) => (a.r.done - b.r.done) || (PRIO_RANK[a.r.prio || "mittel"] - PRIO_RANK[b.r.prio || "mittel"]) || a.st.name.localeCompare(b.st.name, "de"));
+}
+function auslastung(st, mess) {
+  const kva = Number(st.kva) || 0; if (!kva || !mess) return null;
+  const vals = ["R", "S", "T"].map((p) => Number(mess[p] && mess[p].mw)).filter((n) => Number.isFinite(n) && n > 0);
+  if (!vals.length) return null;
+  const iN = kva / (Math.sqrt(3) * 0.42); // Nennstrom bei 420 V
+  return { pct: Math.max(...vals) / iN * 100, iN, imax: Math.max(...vals) };
+}
+function lastVisit(sid) {
+  return Object.values(S.data.log).filter((e) => e.sid === sid).sort((a, b) => (b.datum + b.von).localeCompare(a.datum + a.von))[0];
+}
+
+/* ---------- Export ---------- */
+function csvCell(v) { const s = String(v ?? ""); return /[;"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+function toCSV(rows) { return "﻿" + rows.map((r) => r.map(csvCell).join(";")).join("\r\n"); }
+function repairRows(list) {
+  return [["Station", "Jahr", "Bereich", "Prüfpunkt", "Priorität", "Mangel / Bemerkung", "Status", "Erledigt am", "Prüfer"]]
+    .concat(list.map(({ ins, st, g, it, r }) => [st.name, ins.jahr, g.t, it.label, PRIO_LABEL[r.prio || "mittel"], r.note || "", r.done ? "erledigt" : "offen", r.doneAt ? fmtDate(r.doneAt) : "", ins.pruefer || ""]));
+}
+function exportInspCSV(st, ins) {
+  const list = defectsAll().filter((d) => d.ins.id === ins.id);
+  offerFile(`Reparaturliste_${slug(st.name)}_${ins.jahr}.csv`, toCSV(repairRows(list)), "text/csv");
+}
+function exportAllCSV() {
+  const list = defectsAll().filter((d) => S.ui.mfilter === "alle" || !d.r.done);
+  offerFile(`Maengelliste_alle_Stationen_${todayISO()}.csv`, toCSV(repairRows(list)), "text/csv");
+}
+function exportInspHTML(st, ins) {
+  const groups = template(st);
+  const a = auslastung(st, ins.mess);
+  const defects = defectsAll().filter((d) => d.ins.id === ins.id);
+  const stat = inspStats(ins, st);
+  const lbl = { ok: "i. O.", m: "Mangel", na: "n. v." };
+  const rowsChk = groups.map((g) => `<tr class="g"><td colspan="4">${esc(g.t)}</td></tr>` + g.items.map((it) => {
+    const r = (ins.results || {})[it.key] || {};
+    return `<tr><td>${esc(it.label)}</td><td class="s ${r.s || ""}">${r.s ? lbl[r.s] : "–"}</td><td>${r.s === "m" ? esc(PRIO_LABEL[r.prio || "mittel"]) : ""}</td><td>${esc(r.note || "")}</td></tr>`;
+  }).join("")).join("");
+  const m = ins.mess || {};
+  const mrow = (p) => `<tr><td>${p}</td><td class="n">${esc((m[p] || {}).mb || "")}</td><td class="n">${esc((m[p] || {}).mw || "")}</td><td>${esc((m[p] || {}).anm || "")}</td></tr>`;
+  const html = `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Inspektion ${esc(st.name)} ${ins.jahr}</title>
+<style>body{font:14px/1.45 "Segoe UI",Arial,sans-serif;color:#14202c;max-width:900px;margin:24px auto;padding:0 16px}h1{font-size:24px;margin:0}h2{font-size:17px;margin:28px 0 8px;border-bottom:3px solid #f2b705;padding-bottom:4px}
+table{border-collapse:collapse;width:100%}td,th{border:1px solid #c9d2dc;padding:6px 8px;text-align:left;vertical-align:top}th{background:#eef1f5}tr.g td{background:#e2ebf6;font-weight:700}.n{text-align:right;font-variant-numeric:tabular-nums}
+.s.ok{color:#1d8049;font-weight:700}.s.m{color:#c22929;font-weight:700}.meta td:first-child{width:220px;color:#586777}.hoch{color:#c22929;font-weight:700}.sig{display:flex;gap:40px;margin-top:48px}.sig div{flex:1;border-top:1px solid #14202c;padding-top:4px;color:#586777}
+@media print{body{margin:0}h2{break-after:avoid}tr{break-inside:avoid}}</style></head><body>
+<h1>Stationsinspektion ${ins.jahr} – ${esc(st.name)}</h1>
+<p style="color:#586777">Erstellt mit StationsBuch am ${fmtDate(todayISO())} · Status: ${ins.status === "abgeschlossen" ? "abgeschlossen" : "in Arbeit"}</p>
+<h2>Stammdaten</h2><table class="meta">
+<tr><td>Station</td><td>${esc(st.name)}${st.nr ? " (" + esc(st.nr) + ")" : ""}</td></tr>
+<tr><td>Bauart</td><td>${esc(st.typ || "–")}</td></tr>
+<tr><td>Trafo Inv.-Nr. / Nennleistung</td><td>${esc(st.trafoInv || "–")} / ${esc(st.kva || "–")} kVA, Stufe ${esc(st.stufe || "–")}</td></tr>
+<tr><td>Inspektionsdatum</td><td>${fmtDate(ins.datum)}</td></tr><tr><td>Prüfer</td><td>${esc(ins.pruefer || "–")}</td></tr>
+<tr><td>Ergebnis</td><td>${stat.answered} von ${stat.total} Prüfpunkten bewertet · ${stat.defects} Mängel (${stat.open} offen)</td></tr></table>
+<h2>Reparaturliste</h2>${defects.length ? `<table><tr><th>Bereich</th><th>Prüfpunkt</th><th>Priorität</th><th>Mangel / Bemerkung</th><th>Status</th></tr>${defects.map(({ g, it, r }) => `<tr><td>${esc(g.t)}</td><td>${esc(it.label)}</td><td class="${r.prio || "mittel"}">${esc(PRIO_LABEL[r.prio || "mittel"])}</td><td>${esc(r.note || "")}</td><td>${r.done ? "erledigt " + fmtDate(r.doneAt) : "offen"}</td></tr>`).join("")}</table>` : "<p>Keine Mängel festgestellt.</p>"}
+<h2>Amperemetermessung</h2><table><tr><th>Phase</th><th class="n">Messbereich [A]</th><th class="n">Messwert [A]</th><th>Anmerkung</th></tr>${["R", "S", "T", "N"].map(mrow).join("")}</table>
+<p>Momentantemperatur: ${esc(m.tNow || "–")} °C · Maximaltemperatur: ${esc(m.tMax || "–")} °C${a ? ` · <b>Auslastung: ${Math.round(a.pct)} %</b> (I<sub>max</sub> ${Math.round(a.imax)} A von I<sub>N</sub> ${Math.round(a.iN)} A)` : ""}</p>${m.bem ? `<p>Bemerkung: ${esc(m.bem)}</p>` : ""}
+<h2>Prüfprotokoll</h2><table><tr><th>Prüfpunkt</th><th>Befund</th><th>Priorität</th><th>Bemerkung</th></tr>${rowsChk}</table>
+<div class="sig"><div>Datum, Unterschrift Prüfer</div><div>Datum, Unterschrift Netzbetrieb</div></div>
+</body></html>`;
+  offerFile(`Inspektion_${slug(st.name)}_${ins.jahr}.html`, html, "text/html");
+}
+
+/* ---------- Rendering ---------- */
+let renderQueued = false;
+function render() {
+  if (renderQueued) return; renderQueued = true;
+  requestAnimationFrame(() => { renderQueued = false; doRender(); });
+}
+function doRender() {
+  const ae = document.activeElement; const focusId = ae && ae.id; let sel = null;
+  try { if (focusId && ae.selectionStart != null) sel = [ae.selectionStart, ae.selectionEnd]; } catch {}
+  const app = document.getElementById("app");
+  // offene <details> merken
+  app.querySelectorAll("details[data-k]").forEach((d) => { S.ui.open[d.dataset.k] = d.open; });
+  const v = S.view;
+  renderNav();
+  if (S.mode === "loading") { app.innerHTML = '<div class="loading">StationsBuch wird geladen …</div>'; return; }
+  let html = modeNotice();
+  if (v.name === "station" && S.data.stations[v.sid]) html += viewStation(S.data.stations[v.sid]);
+  else if (v.name === "maengel") html += viewMaengel();
+  else html += viewList();
+  app.innerHTML = html;
+  renderOverlay();
+  if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus({ preventScroll: true }); if (sel) try { el.setSelectionRange(sel[0], sel[1]); } catch {} } }
+}
+function renderNav() {
+  const open = defectsAll().filter((d) => !d.r.done).length;
+  const cur = S.view.name;
+  document.getElementById("topnav").innerHTML = `
+    <button data-act="go-list" ${cur !== "maengel" ? 'aria-current="page"' : ""}>${ic("book")}<span class="lbl">Stationen</span></button>
+    <button data-act="go-maengel" ${cur === "maengel" ? 'aria-current="page"' : ""}>${ic("alert")}<span class="lbl">Mängel</span>${open ? `<span class="count">${open}</span>` : ""}</button>`;
+}
+function modeNotice() {
+  let h = "";
+  if (S.mode === "local" && S.demo) h += `<div class="notice">${ic("info")}<div><b>Beispieldaten.</b> Diese Kopie speichert nur in diesem Browser. Einträge, Fotos und Inspektionen unten sind Beispiele.</div><button class="btn sm" data-act="clear-demo">Beispiele löschen</button></div>`;
+  if (S.readOnly) h += `<div class="notice">${ic("lock")}<div><b>Nur Lesen.</b> Du kannst dieses Stationsbuch ansehen, aber nichts eintragen. Bitte den Besitzer, dich als Mitwirkende/n freizugeben.</div></div>`;
+  return h;
+}
+
+/* Liste */
+function viewList() {
+  const sts = Object.values(S.data.stations).sort((a, b) => a.name.localeCompare(b.name, "de"));
+  const states = sts.map((s) => stationState(s));
+  const done = states.filter((s) => s === "done").length;
+  const wip = states.filter((s) => s === "wip").length;
+  const defects = defectsAll().filter((d) => !d.r.done);
+  const hoch = defects.filter((d) => d.r.prio === "hoch").length;
+  const since = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+  const visits = Object.values(S.data.log).filter((e) => e.datum >= since).length;
+  const q = S.ui.q.trim().toLowerCase();
+  const openBySt = {}; defects.forEach((d) => { openBySt[d.st.id] = (openBySt[d.st.id] || 0) + 1; });
+  const list = sts.filter((s) => {
+    if (q && !(s.name + " " + (s.nr || "") + " " + (s.ort || "")).toLowerCase().includes(q)) return false;
+    if (S.ui.filter === "faellig" && stationState(s) === "done") return false;
+    if (S.ui.filter === "maengel" && !openBySt[s.id]) return false;
+    return true;
+  });
+  const stIcon = { due: "clip", wip: "clock", done: "check" };
+  const stTitle = { due: `Inspektion ${YEAR} fällig`, wip: `Inspektion ${YEAR} in Arbeit`, done: `Inspektion ${YEAR} erledigt` };
+  const rows = list.map((s) => {
+    const state = stationState(s); const lv = lastVisit(s.id);
+    const sub = [s.typ, s.kva ? s.kva + " kVA" : "", lv ? `zuletzt ${fmtDate(lv.datum)} · ${lv.name}` : "noch kein Eintrag"].filter(Boolean).join(" · ");
+    return `<button class="st" data-act="open-station" data-id="${esc(s.id)}">
+      <span class="st-state ${state}" title="${stTitle[state]}">${ic(stIcon[state])}</span>
+      <span style="min-width:0"><span class="st-name">${esc(s.name)}</span><br><span class="st-sub">${esc(sub)}</span></span>
+      <span class="st-right">${openBySt[s.id] ? `<span class="chip bad">${ic("alert", "sm")}${openBySt[s.id]}</span>` : ""}${ic("chevron")}</span>
+    </button>`;
+  }).join("");
+  const n = sts.length || 1;
+  return `
+  <section class="hello"><h1>Stationen</h1><p class="muted">Eintragen beim Betreten, Fotos ablegen, Jahresinspektion ${YEAR} durchführen.</p></section>
+  <section class="stats">
+    <div class="card stat"><span class="label">Inspektion ${YEAR}</span><span class="big">${done}<small> / ${sts.length} erledigt</small></span>
+      <div class="bar" role="img" aria-label="${done} von ${sts.length} erledigt"><i style="width:${(done / n) * 100}%"></i></div><span class="muted" style="font-size:13px">${wip} in Arbeit · ${sts.length - done - wip} fällig</span></div>
+    <div class="card stat"><span class="label">Offene Mängel</span><span class="big" style="color:${defects.length ? "var(--bad)" : "var(--ok)"}">${defects.length}</span><span class="muted" style="font-size:13px">${hoch} davon dringend</span></div>
+    <div class="card stat"><span class="label">Besuche letzte 30 Tage</span><span class="big">${visits}</span><span class="muted" style="font-size:13px">Einträge in allen Stationsbüchern</span></div>
+  </section>
+  <section class="toolbar">
+    <label class="search">${ic("search")}<input id="q" type="search" placeholder="Station suchen" value="${esc(S.ui.q)}" data-bind="q" aria-label="Station suchen"></label>
+    <div class="seg" role="group" aria-label="Filter">
+      ${[["alle", "Alle"], ["faellig", "Inspektion offen"], ["maengel", "Mit Mängeln"]].map(([k, l]) => `<button data-act="filter" data-v="${k}" aria-pressed="${S.ui.filter === k}">${l}</button>`).join("")}
+    </div>
+    ${S.readOnly ? "" : `<button class="btn" data-act="new-station">${ic("plus")}Station</button>`}
+  </section>
+  <section class="card stations">${rows || `<div class="empty">${ic("book")}<b>${sts.length ? "Keine Station passt zum Filter" : "Noch keine Stationen"}</b><span>${sts.length ? "Suche oder Filter ändern." : "Lege die erste Station mit „+ Station“ an."}</span></div>`}
+    ${rows ? `<div class="legend"><span><i class="dot" style="background:var(--surface-2);border:1px dashed var(--muted)"></i>Inspektion fällig</span><span><i class="dot" style="background:var(--warn)"></i>in Arbeit</span><span><i class="dot" style="background:var(--ok)"></i>erledigt</span></div>` : ""}
+  </section>`;
+}
+
+/* Station */
+function viewStation(st) {
+  const v = S.view;
+  const nLog = Object.values(S.data.log).filter((e) => e.sid === st.id).length;
+  const nPh = Object.values(S.data.photos).filter((p) => p.sid === st.id).length;
+  const state = stationState(st);
+  const stateChip = { due: `<span class="chip">Inspektion ${YEAR} fällig</span>`, wip: `<span class="chip warn">Inspektion ${YEAR} in Arbeit</span>`, done: `<span class="chip ok">${ic("check", "sm")}Inspektion ${YEAR} erledigt</span>` }[state];
+  const tabs = [["buch", "book", "Stationsbuch", nLog], ["fotos", "camera", "Fotos", nPh], ["insp", "clip", "Inspektion", null], ["daten", "sliders", "Stammdaten", null]];
+  let body = "";
+  if (v.tab === "fotos") body = tabFotos(st);
+  else if (v.tab === "insp") body = tabInsp(st);
+  else if (v.tab === "daten") body = tabDaten(st);
+  else body = tabBuch(st);
+  const maps = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(st.gps || ("Trafostation " + st.name + " " + (st.ort || "")));
+  return `
+  <nav class="crumbs" aria-label="Pfad"><button data-act="go-list">Stationen</button>${ic("chevron", "sm")}<span>${esc(st.name)}</span></nav>
+  <section class="sthead">
+    <div style="min-width:0"><h1>${esc(st.name)}</h1>
+      <div class="facts">${st.typ ? `<span>${esc(st.typ)}</span>` : ""}${st.trafoInv ? `<span>Trafo <b class="mono">${esc(st.trafoInv)}</b></span>` : ""}${st.kva ? `<span><b class="mono">${esc(st.kva)}</b> kVA</span>` : ""}${st.ms ? `<span>MS <b>${esc(st.ms)}</b></span>` : ""}${stateChip}</div>
+    </div>
+    <div class="row-flex">
+      <a class="btn" href="${esc(maps)}" target="_blank" rel="noopener">${ic("route")}Navigation</a>
+      ${S.readOnly ? "" : `<button class="btn signal" data-act="quick-entry">${ic("plus")}Eintragen</button>`}
+    </div>
+  </section>
+  <div class="tabs" role="tablist">${tabs.map(([k, i, l, n]) => `<button role="tab" data-act="tab" data-v="${k}" aria-selected="${v.tab === k}">${ic(i, "sm")}${l}${n != null ? `<span class="n">${n}</span>` : ""}</button>`).join("")}</div>
+  ${body}`;
+}
+
+function tabBuch(st) {
+  const entries = Object.values(S.data.log).filter((e) => e.sid === st.id).sort((a, b) => (b.datum + b.von).localeCompare(a.datum + a.von));
+  const d = S.ui.draft;
+  let form = "";
+  if (S.ui.logOpen && d && !S.readOnly) {
+    form = `<form class="card pad formcard" data-form="log">
+      <h2>Eintrag ins Stationsbuch</h2>
+      <div class="grid2">
+        <label class="field"><span>Name</span><input id="lg-name" type="text" required data-bind="draft.name" value="${esc(d.name)}" autocomplete="name"></label>
+        <label class="field"><span>Firma / Abteilung</span><input id="lg-firma" type="text" data-bind="draft.firma" value="${esc(d.firma)}" placeholder="z. B. Netzbetrieb Gmunden"></label>
+      </div>
+      <div class="grid2">
+        <label class="field"><span>Datum</span><input id="lg-datum" type="date" required data-bind="draft.datum" value="${esc(d.datum)}"></label>
+        <label class="field"><span>Ankunft</span><input id="lg-von" type="time" required data-bind="draft.von" value="${esc(d.von)}"></label>
+        <label class="field"><span>Abfahrt</span><input id="lg-bis" type="time" data-bind="draft.bis" value="${esc(d.bis)}"></label>
+      </div>
+      <div class="field"><span>Grund des Besuchs</span><div class="reasons">${REASONS.map((r) => `<button type="button" data-act="reason" data-v="${esc(r)}" aria-pressed="${d.grund === r}">${esc(r)}</button>`).join("")}</div></div>
+      <label class="field"><span>Was wurde gemacht?</span><textarea id="lg-text" data-bind="draft.text" placeholder="z. B. Schleppzeiger abgelesen und zurückgesetzt, Sicherung NS-Abgang 3 getauscht">${esc(d.text)}</textarea></label>
+      <label class="check"><input id="lg-ok" type="checkbox" data-bind="draft.ok" ${d.ok ? "checked" : ""}>Station in ordnungsgemäßem Zustand verlassen und versperrt</label>
+      <div class="row-flex"><button class="btn primary" type="submit">${ic("check")}Eintrag speichern</button><button class="btn ghost" type="button" data-act="log-cancel">Abbrechen</button></div>
+    </form>`;
+  } else if (!S.readOnly) {
+    form = `<button class="btn signal" data-act="quick-entry" style="justify-self:start">${ic("plus")}Neuer Eintrag</button>`;
+  }
+  let list = ""; let lastM = "";
+  for (const e of entries) {
+    const m = e.datum.slice(0, 7);
+    if (m !== lastM) { lastM = m; const [y, mm] = m.split("-"); list += `<div class="month label">${MONTHS[Number(mm) - 1]} ${y}</div>`; }
+    const dt = new Date(e.datum + "T12:00:00");
+    list += `<article class="entry">
+      <div class="when"><div class="day">${pad2(dt.getDate())}</div><div class="wd">${WD[dt.getDay()]}</div></div>
+      <div style="min-width:0">
+        <div class="row-flex"><span class="who">${esc(e.name)}</span>${e.firma ? `<span class="muted">${esc(e.firma)}</span>` : ""}<span class="chip brand">${esc(e.grund)}</span></div>
+        ${e.text ? `<p class="txt">${esc(e.text)}</p>` : ""}
+        <div class="meta"><span class="mono">${esc(e.von)}${e.bis ? "–" + esc(e.bis) : ""}</span>${e.ok ? `<span style="color:var(--ok)">${ic("lock", "sm")} versperrt verlassen</span>` : `<span style="color:var(--warn)">${ic("alert", "sm")} Abschluss nicht bestätigt</span>`}
+        ${!S.readOnly ? `<button class="btn ghost sm" data-act="log-del" data-id="${esc(e.id)}" aria-label="Eintrag löschen">${ic("trash", "sm")}</button>` : ""}</div>
+      </div></article>`;
+  }
+  return `${form}<section class="card entries">${list || `<div class="empty">${ic("book")}<b>Noch keine Einträge</b><span>Wer die Station betritt, trägt sich hier mit Grund und Uhrzeit ein.</span></div>`}</section>`;
+}
+
+function tabFotos(st) {
+  const all = Object.values(S.data.photos).filter((p) => p.sid === st.id).sort((a, b) => b.ts.localeCompare(a.ts));
+  const canUp = !S.readOnly && !(S.mode === "db" && !S.assets);
+  const f = S.view.folder;
+  if (!f) {
+    return `<p class="muted">Fotos der Station und ihres Inhalts, nach Bereichen geordnet. Mängelfotos aus der Inspektion landen automatisch im Ordner „Mängel“.</p>
+    <section class="folders">${FOLDERS.map((name) => {
+      const ps = all.filter((p) => p.folder === name);
+      return `<button class="folder" data-act="folder" data-v="${esc(name)}">
+        <span class="cover">${ps[0] ? `<img src="${esc(photoSrc(ps[0]))}" alt="" loading="lazy">` : ic("folder")}</span>
+        <span class="fn"><span>${esc(name)}</span><span class="muted mono">${ps.length}</span></span></button>`;
+    }).join("")}</section>`;
+  }
+  const ps = all.filter((p) => p.folder === f);
+  return `<nav class="crumbs"><button data-act="folder" data-v="">${ic("back", "sm")} Alle Ordner</button></nav>
+    <div class="row-flex" style="justify-content:space-between"><h2 style="font-family:var(--font-display);font-size:24px">${esc(f)}</h2>
+    ${canUp ? `<label class="btn primary upload">${ic("camera")}Foto aufnehmen / hochladen<input id="up-folder" type="file" accept="image/*" multiple data-upload="folder"></label>` : ""}</div>
+    ${ps.length ? `<section class="photos">${ps.map((p) => `<button class="photo" data-act="lightbox" data-id="${esc(p.id)}"><img src="${esc(photoSrc(p))}" alt="${esc(p.caption || f)}" loading="lazy"><span class="cap">${esc(p.caption || fmtDate(p.ts))}</span></button>`).join("")}</section>`
+      : `<div class="card empty">${ic("camera")}<b>Ordner ist leer</b><span>${canUp ? "Am Handy öffnet „Foto aufnehmen“ direkt die Kamera." : "Hier wurden noch keine Fotos abgelegt."}</span></div>`}`;
+}
+
+function tabInsp(st) {
+  const year = S.view.year;
+  const years = new Set([YEAR, ...Object.values(S.data.inspections).filter((i) => i.sid === st.id).map((i) => Number(i.jahr))]);
+  const yearSel = `<div class="seg" role="group" aria-label="Jahr">${[...years].sort((a, b) => b - a).map((y) => `<button data-act="year" data-v="${y}" aria-pressed="${y === year}">${y}</button>`).join("")}</div>`;
+  const ins = inspFor(st.id, year);
+  if (!ins) {
+    return `<div class="row-flex" style="justify-content:space-between">${yearSel}</div>
+    <div class="card empty">${ic("clip")}<b>Inspektion ${year} noch nicht begonnen</b><span>Die Checkliste wird aus den Stammdaten der Station erstellt (${template(st).reduce((n, g) => n + g.items.length, 0)} Prüfpunkte + Amperemetermessung).</span>
+    ${S.readOnly ? "" : `<button class="btn primary" data-act="insp-start">${ic("plus")}Inspektion ${year} starten</button>`}</div>`;
+  }
+  const ro = S.readOnly || ins.status === "abgeschlossen";
+  const groups = template(st);
+  const stat = inspStats(ins, st);
+  const pct = stat.total ? Math.round(stat.answered / stat.total * 100) : 0;
+  const head = `<section class="card pad insp-head">
+    <div class="row-flex" style="justify-content:space-between">${yearSel}
+      ${ins.status === "abgeschlossen" ? `<span class="chip ok">${ic("check", "sm")}abgeschlossen ${fmtDate(ins.closedAt)}</span>` : `<span class="chip warn">in Arbeit</span>`}</div>
+    <div class="grid2">
+      <label class="field"><span>Inspektionsdatum</span><input id="in-datum" type="date" value="${esc(ins.datum)}" data-ins="datum" ${ro ? "disabled" : ""}></label>
+      <label class="field"><span>Prüfer</span><input id="in-pruefer" type="text" value="${esc(ins.pruefer)}" data-ins="pruefer" ${ro ? "disabled" : ""}></label>
+    </div>
+    <div class="progress-line"><span class="mono">${stat.answered}/${stat.total}</span><div class="bar"><i style="width:${pct}%;background:${pct === 100 ? "var(--ok)" : "var(--brand)"}"></i></div><span class="chip ${stat.defects ? "bad" : "ok"}">${stat.defects} Mängel</span></div>
+  </section>`;
+
+  const groupHTML = groups.map((g) => {
+    const items = g.items; let a = 0, m = 0;
+    items.forEach((it) => { const r = (ins.results || {})[it.key]; if (r && r.s) a++; if (r && r.s === "m") m++; });
+    const k = ins.id + ":" + g.k;
+    const open = S.ui.open[k] ?? (a < items.length && !ro);
+    return `<details class="card group" data-k="${esc(k)}" ${open ? "open" : ""}>
+      <summary><span class="gicon">${ic(g.icon)}</span><span style="min-width:0"><span class="gt">${esc(g.t)}</span><br><span class="gs">${a}/${items.length} geprüft</span></span>
+      <span>${m ? `<span class="chip bad">${m} Mangel${m > 1 ? "" : ""}</span>` : a === items.length ? `<span class="chip ok">${ic("check", "sm")}i. O.</span>` : ""}</span></summary>
+      ${items.map((it) => itemHTML(st, ins, it, ro)).join("")}
+    </details>`;
+  }).join("");
+
+  const mess = ins.mess || {};
+  const au = auslastung(st, mess);
+  const cls = !au ? "" : au.pct >= 90 ? "bad" : au.pct >= 70 ? "warn" : "ok";
+  const gaugeArc = (p) => {
+    const t = Math.min(1, Math.max(0, p / 120)); const ang = Math.PI * (1 - t);
+    const x = 80 + 62 * Math.cos(ang), y = 80 - 62 * Math.sin(ang);
+    return `<svg viewBox="0 0 160 92" aria-hidden="true"><path d="M18 80 A62 62 0 0 1 142 80" fill="none" stroke="var(--line)" stroke-width="12" stroke-linecap="round"/>
+      ${p > 0 ? `<path d="M18 80 A62 62 0 0 1 ${x.toFixed(1)} ${y.toFixed(1)}" fill="none" stroke="var(--${cls})" stroke-width="12" stroke-linecap="round"/>` : ""}
+      <line x1="${(80 + 50 * Math.cos(Math.PI / 6)).toFixed(1)}" y1="${(80 - 50 * Math.sin(Math.PI / 6)).toFixed(1)}" x2="${(80 + 74 * Math.cos(Math.PI / 6)).toFixed(1)}" y2="${(80 - 74 * Math.sin(Math.PI / 6)).toFixed(1)}" stroke="var(--muted)" stroke-width="2"/></svg>`;
+  };
+  const mi = (p, f, ph = "") => `<input id="ms-${p}-${f}" type="number" inputmode="decimal" value="${esc((mess[p] || {})[f] ?? "")}" data-mess="${p}.${f}" placeholder="${ph}" ${ro ? "disabled" : ""} aria-label="${p} ${f}">`;
+  const messHTML = `<section class="card pad" style="display:grid;gap:14px">
+    <div class="row-flex"><span class="gicon">${ic("amp")}</span><h2 style="font-family:var(--font-display);font-size:22px">Amperemetermessung</h2><span class="muted">Trafo ${esc(st.trafoInv || "–")} · ${esc(st.kva || "–")} kVA · Stufe ${esc(st.stufe || "–")}</span></div>
+    <div class="mess">
+      <div class="tbl-wrap"><table class="mess-tbl"><thead><tr><th>Phase</th><th class="num">Messbereich [A]</th><th class="num">Messwert [A]</th><th>Anm.</th></tr></thead><tbody>
+        ${["R", "S", "T", "N"].map((p) => `<tr><td><b>${p}</b></td><td>${mi(p, "mb", "1000")}</td><td>${mi(p, "mw")}</td><td><input id="ms-${p}-anm" type="text" value="${esc((mess[p] || {}).anm || "")}" data-mess="${p}.anm" ${ro ? "disabled" : ""} aria-label="${p} Anmerkung" style="text-align:left;font-family:var(--font-ui)"></td></tr>`).join("")}
+      </tbody></table></div>
+      <div class="gauge ${cls}">${au ? gaugeArc(au.pct) : gaugeArc(0)}<span class="pct">${au ? Math.round(au.pct) + " %" : "–"}</span><span class="label">Auslastung</span>
+        <span class="muted" style="font-size:13px">${au ? `I<sub>max</sub> ${Math.round(au.imax)} A von I<sub>N</sub> ${Math.round(au.iN)} A (bei 420 V)` : st.kva ? "Messwerte R/S/T eintragen" : "Nennleistung in den Stammdaten fehlt"}</span></div>
+    </div>
+    <div class="grid2">
+      <label class="field"><span>Momentantemperatur [°C]</span><input id="ms-tnow" type="number" value="${esc(mess.tNow ?? "")}" data-mess="tNow" ${ro ? "disabled" : ""}></label>
+      <label class="field"><span>Maximaltemperatur (Schleppzeiger) [°C]</span><input id="ms-tmax" type="number" value="${esc(mess.tMax ?? "")}" data-mess="tMax" ${ro ? "disabled" : ""}></label>
+    </div>
+    <label class="field"><span>Bemerkung</span><input id="ms-bem" type="text" value="${esc(mess.bem || "")}" data-mess="bem" ${ro ? "disabled" : ""}></label>
+  </section>`;
+
+  const defects = defectsAll().filter((d) => d.ins.id === ins.id);
+  const repair = `<section class="card" style="overflow:hidden">
+    <div class="pad row-flex" style="justify-content:space-between"><div><h2 style="font-family:var(--font-display);font-size:22px">Reparaturliste</h2><span class="muted">Alle Mängel dieser Inspektion – zum Abhaken, sobald behoben.</span></div>
+      <div class="row-flex"><button class="btn sm" data-act="exp-csv">${ic("download", "sm")}Tabelle (CSV/Excel)</button><button class="btn sm" data-act="exp-html">${ic("download", "sm")}Prüfbericht</button></div></div>
+    ${defects.length ? repairTable(defects, false) : `<div class="empty">${ic("check")}<b>Keine Mängel erfasst</b><span>Prüfpunkte mit „Mangel“ erscheinen hier automatisch.</span></div>`}
+  </section>`;
+
+  const canClose = stat.answered === stat.total;
+  const foot = S.readOnly ? "" : ins.status === "abgeschlossen"
+    ? `<div class="row-flex"><button class="btn" data-act="insp-reopen">Inspektion wieder öffnen</button></div>`
+    : `<div class="row-flex"><button class="btn primary" data-act="insp-close" ${canClose ? "" : "disabled"}>${ic("check")}Inspektion abschließen</button>${canClose ? "" : `<span class="muted">Noch ${stat.total - stat.answered} Prüfpunkte offen.</span>`}</div>`;
+  return head + `<section class="groups">${groupHTML}</section>` + messHTML + repair + foot;
+}
+function itemHTML(st, ins, it, ro) {
+  const r = (ins.results || {})[it.key] || {};
+  const b = (s, label, icn) => `<button class="${s}" data-act="res" data-k="${esc(it.key)}" data-v="${s}" aria-pressed="${r.s === s}" ${ro ? "disabled" : ""}>${ic(icn, "sm")}${label}</button>`;
+  let def = "";
+  if (r.s === "m") {
+    const photos = (r.photos || []).map((id) => S.data.photos[id]).filter(Boolean);
+    def = `<div class="defect">
+      <div class="prio"><span class="label" style="color:var(--bad)">Dringlichkeit</span>${PRIOS.map(([k, l]) => `<button class="${k}" data-act="prio" data-k="${esc(it.key)}" data-v="${k}" aria-pressed="${(r.prio || "mittel") === k}" ${ro ? "disabled" : ""}>${l}</button>`).join("")}</div>
+      <input id="nt-${esc(slug(it.key))}" type="text" placeholder="Was ist kaputt / was muss repariert werden?" value="${esc(r.note || "")}" data-note="${esc(it.key)}" ${ro ? "disabled" : ""} aria-label="Mangelbeschreibung">
+      <div class="row-flex">
+        <div class="thumbs">${photos.map((p) => `<button data-act="lightbox" data-id="${esc(p.id)}"><img src="${esc(photoSrc(p))}" alt="Mangelfoto"></button>`).join("")}</div>
+        ${!ro && !(S.mode === "db" && !S.assets) ? `<label class="btn sm upload">${ic("camera", "sm")}Foto<input id="up-${esc(slug(it.key))}" type="file" accept="image/*" data-upload="defect" data-k="${esc(it.key)}"></label>` : ""}
+      </div></div>`;
+  }
+  return `<div class="item"><div class="item-top"><span class="item-name">${esc(it.label)}</span><span class="tri" role="group" aria-label="Befund ${esc(it.label)}">${b("ok", "i. O.", "check")}${b("m", "Mangel", "x")}${b("na", "n. v.", "minus")}</span></div>${def}</div>`;
+}
+function repairTable(list, withStation) {
+  return `<div class="tbl-wrap"><table class="repair"><thead><tr><th style="width:44px">Erl.</th>${withStation ? "<th>Station</th>" : ""}<th>Bereich / Prüfpunkt</th><th>Priorität</th><th>Mangel</th>${withStation ? "<th>Jahr</th>" : ""}</tr></thead><tbody>
+    ${list.map(({ ins, st, g, it, r }) => `<tr class="${r.done ? "done" : ""}">
+      <td><input type="checkbox" id="dn-${esc(ins.id)}-${esc(slug(it.key))}" data-act="done" data-ins="${esc(ins.id)}" data-k="${esc(it.key)}" ${r.done ? "checked" : ""} ${S.readOnly ? "disabled" : ""} aria-label="Erledigt" style="width:20px;height:20px;accent-color:var(--ok)"></td>
+      ${withStation ? `<td><button class="btn ghost sm" style="padding:0" data-act="open-station" data-id="${esc(st.id)}" data-tab="insp" data-year="${esc(ins.jahr)}">${esc(st.name)}</button></td>` : ""}
+      <td class="what"><span class="muted" style="font-size:13px">${esc(g.t)}</span><br>${esc(it.label)}</td>
+      <td><span class="chip ${r.prio === "hoch" ? "bad" : r.prio === "gering" ? "brand" : "warn"}">${esc(PRIO_LABEL[r.prio || "mittel"])}</span></td>
+      <td>${esc(r.note || "–")}${r.done ? `<br><span class="muted" style="font-size:13px">erledigt ${fmtDate(r.doneAt)}</span>` : ""}</td>
+      ${withStation ? `<td class="num">${esc(ins.jahr)}</td>` : ""}
+    </tr>`).join("")}</tbody></table></div>`;
+}
+
+function tabDaten(st) {
+  if (!S.ui.stDraft || S.ui.stDraft.id !== st.id) S.ui.stDraft = clone(st);
+  const d = S.ui.stDraft; const ro = S.readOnly ? "disabled" : "";
+  return `<form class="card pad formcard" data-form="station">
+    <h2>Stammdaten</h2>
+    <div class="grid2">
+      <label class="field"><span>Stationsname</span><input id="sd-name" type="text" required data-bind="stDraft.name" value="${esc(d.name)}" ${ro}></label>
+      <label class="field"><span>Stationsnummer</span><input id="sd-nr" type="text" data-bind="stDraft.nr" value="${esc(d.nr || "")}" ${ro}></label>
+      <label class="field"><span>Bauart</span><select id="sd-typ" data-bind="stDraft.typ" ${ro}>${["", "Kompaktstation", "Begehbare Station", "Turmstation", "Maststation", "Kabelverteiler"].map((t) => `<option value="${t}" ${d.typ === t ? "selected" : ""}>${t || "– nicht erfasst –"}</option>`).join("")}</select></label>
+      <label class="field"><span>Ort / Adresse</span><input id="sd-ort" type="text" data-bind="stDraft.ort" value="${esc(d.ort || "")}" ${ro}></label>
+    </div>
+    <div class="grid2">
+      <label class="field"><span>Trafo Inv.-Nr.</span><input id="sd-inv" type="text" data-bind="stDraft.trafoInv" value="${esc(d.trafoInv || "")}" ${ro}></label>
+      <label class="field"><span>Nennleistung [kVA]</span><input id="sd-kva" type="number" data-bind="stDraft.kva" value="${esc(d.kva || "")}" ${ro}></label>
+      <label class="field"><span>Stufe</span><input id="sd-stufe" type="text" data-bind="stDraft.stufe" value="${esc(d.stufe || "")}" ${ro}></label>
+      <label class="field"><span>MS-Anlage</span><input id="sd-ms" type="text" data-bind="stDraft.ms" value="${esc(d.ms || "")}" placeholder="z. B. 36 kV" ${ro}></label>
+    </div>
+    <div class="field"><span>Leitungsabgänge (MS) – je Abgang ein eigener Prüfbereich</span>
+      <div style="display:grid;gap:6px">${(d.abgaenge || []).map((a, i) => `<div class="row-flex" style="flex-wrap:nowrap"><input id="sd-ab-${i}" type="text" value="${esc(a)}" data-bind="stDraft.abgaenge.${i}" ${ro}>${ro ? "" : `<button type="button" class="btn ghost" data-act="ab-del" data-i="${i}" aria-label="Abgang entfernen">${ic("x")}</button>`}</div>`).join("")}
+      ${ro ? "" : `<button type="button" class="btn sm" style="justify-self:start" data-act="ab-add">${ic("plus", "sm")}Abgang</button>`}</div></div>
+    <label class="check"><input id="sd-dk" type="checkbox" data-bind="stDraft.dk" ${d.dk ? "checked" : ""} ${ro}>Datenkonzentrator vorhanden</label>
+    <label class="field"><span>Koordinaten für Navigation (optional)</span><input id="sd-gps" type="text" data-bind="stDraft.gps" value="${esc(d.gps || "")}" placeholder="48.0123, 13.7890" ${ro}></label>
+    <label class="field"><span>Hinweise (Schlüssel, Zufahrt …)</span><textarea id="sd-notiz" data-bind="stDraft.notiz" ${ro}>${esc(d.notiz || "")}</textarea></label>
+    ${ro ? "" : `<div class="row-flex"><button class="btn primary" type="submit">${ic("check")}Speichern</button>
+      ${S.ui.confirmDel ? `<span class="muted">Station mit allen Einträgen, Fotos und Inspektionen löschen?</span><button type="button" class="btn danger" data-act="st-del-yes">Ja, löschen</button><button type="button" class="btn ghost" data-act="st-del-no">Nein</button>`
+        : `<button type="button" class="btn danger" data-act="st-del" style="margin-left:auto">${ic("trash")}Station löschen</button>`}</div>`}
+  </form>`;
+}
+
+function viewMaengel() {
+  const all = defectsAll();
+  const list = all.filter((d) => S.ui.mfilter === "alle" || !d.r.done);
+  const openN = all.filter((d) => !d.r.done).length;
+  return `<section class="hello"><h1>Mängel</h1><p class="muted">Alle bei Inspektionen festgestellten Mängel über alle Stationen – sortiert nach Dringlichkeit.</p></section>
+  <section class="toolbar">
+    <div class="seg" role="group" aria-label="Filter"><button data-act="mfilter" data-v="offen" aria-pressed="${S.ui.mfilter === "offen"}">Offen (${openN})</button><button data-act="mfilter" data-v="alle" aria-pressed="${S.ui.mfilter === "alle"}">Alle (${all.length})</button></div>
+    <button class="btn" data-act="exp-all" style="margin-left:auto" ${list.length ? "" : "disabled"}>${ic("download")}Als Tabelle herunterladen</button>
+  </section>
+  <section class="card" style="overflow:hidden">${list.length ? repairTable(list, true) : `<div class="empty">${ic("check")}<b>Keine offenen Mängel</b><span>Mängel aus den Inspektionen erscheinen hier.</span></div>`}</section>`;
+}
+
+function renderOverlay() {
+  const o = document.getElementById("overlay");
+  if (S.ui.lightbox) {
+    const p = S.data.photos[S.ui.lightbox];
+    if (!p) { S.ui.lightbox = null; o.innerHTML = ""; return; }
+    const st = S.data.stations[p.sid];
+    o.innerHTML = `<div class="sheet" data-act="close-sheet"><div class="sheet-in card pad" data-stop="1">
+      <img src="${esc(photoSrc(p))}" alt="${esc(p.caption || p.folder)}">
+      <div class="row-flex" style="justify-content:space-between"><div><b>${esc(st ? st.name : "")} · ${esc(p.folder)}</b><br><span class="muted">${fmtDate(p.ts)}${p.by ? " · " + esc(p.by) : ""}</span></div>
+      <div class="row-flex">${S.readOnly ? "" : `<button class="btn danger sm" data-act="photo-del" data-id="${esc(p.id)}">${ic("trash", "sm")}Löschen</button>`}<button class="btn sm" data-act="close-sheet">Schließen</button></div></div>
+      <label class="field"><span>Beschreibung</span><input id="ph-cap" type="text" value="${esc(p.caption || "")}" data-caption="${esc(p.id)}" ${S.readOnly ? "disabled" : ""} placeholder="z. B. Typenschild Trafo"></label>
+    </div></div>`;
+  } else if (S.ui.newStation) {
+    o.innerHTML = `<div class="sheet" data-act="close-sheet"><form class="sheet-in form card pad formcard" data-stop="1" data-form="newstation">
+      <h2>Neue Station</h2>
+      <label class="field"><span>Stationsname</span><input id="ns-name" type="text" required data-bind="newStation.name" value="${esc(S.ui.newStation.name)}" placeholder="z. B. GSCHWANDT ORT"></label>
+      <div class="row-flex"><button class="btn primary" type="submit">Anlegen</button><button class="btn ghost" type="button" data-act="close-sheet">Abbrechen</button></div>
+    </form></div>`;
+    setTimeout(() => { const i = document.getElementById("ns-name"); if (i && document.activeElement !== i) i.focus(); }, 30);
+  } else o.innerHTML = "";
+}
+
+let toastT;
+function toast(msg) { const t = document.getElementById("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 3200); }
+
+/* ---------- Navigation ---------- */
+function go(view) {
+  Object.assign(S.view, view);
+  S.ui.confirmDel = false;
+  const h = S.view.name === "station" ? "#st-" + S.view.sid : S.view.name === "maengel" ? "#maengel" : "";
+  if (location.hash !== h) { try { history.replaceState(null, "", h || location.pathname + location.search); } catch { location.hash = h; } }
+  render(); window.scrollTo(0, 0);
+}
+function fromHash() {
+  const h = location.hash.slice(1);
+  if (h === "maengel") S.view.name = "maengel";
+  else if (h.startsWith("st-") && S.data.stations[h.slice(3)]) { S.view.name = "station"; S.view.sid = h.slice(3); }
+}
+window.addEventListener("hashchange", () => { fromHash(); render(); });
+
+function setPath(obj, path, val) {
+  const ks = path.split("."); let o = obj;
+  for (let i = 0; i < ks.length - 1; i++) o = o[ks[i]];
+  o[ks[ks.length - 1]] = val;
+}
+
+/* ---------- Ereignisse ---------- */
+document.addEventListener("click", async (ev) => {
+  const el = ev.target.closest("[data-act]"); if (!el) return;
+  if (el.dataset.act === "close-sheet" && ev.target.closest("[data-stop]") && !ev.target.closest('button[data-act="close-sheet"]')) return;
+  const act = el.dataset.act; const v = el.dataset.v; const id = el.dataset.id;
+  const st = S.data.stations[S.view.sid];
+  const curIns = st && inspFor(st.id, S.view.year);
+  switch (act) {
+    case "go-list": go({ name: "list" }); break;
+    case "go-maengel": go({ name: "maengel" }); break;
+    case "open-station": go({ name: "station", sid: id, tab: el.dataset.tab || "buch", folder: null, year: Number(el.dataset.year) || YEAR }); break;
+    case "filter": S.ui.filter = v; render(); break;
+    case "mfilter": S.ui.mfilter = v; render(); break;
+    case "tab": S.view.tab = v; S.view.folder = null; S.ui.confirmDel = false; render(); break;
+    case "quick-entry":
+      S.view.tab = "buch"; S.ui.logOpen = true;
+      S.ui.draft = { name: S.myName || ls.get("sb.name") || "", firma: ls.get("sb.firma") || "", datum: todayISO(), von: nowHM(), bis: "", grund: "Inspektion", text: "", ok: true };
+      render(); setTimeout(() => { const f = document.getElementById(S.ui.draft.name ? "lg-text" : "lg-name"); if (f) f.focus(); }, 40); break;
+    case "reason": S.ui.draft.grund = v; render(); break;
+    case "log-cancel": S.ui.logOpen = false; render(); break;
+    case "log-del": if (S.ui.armed === id) { S.ui.armed = null; del("log", id); toast("Eintrag gelöscht"); } else { S.ui.armed = id; toast("Zum Löschen noch einmal tippen"); setTimeout(() => { if (S.ui.armed === id) S.ui.armed = null; }, 3000); } break;
+    case "folder": S.view.folder = v || null; render(); break;
+    case "lightbox": S.ui.lightbox = id; renderOverlay(); break;
+    case "close-sheet": S.ui.lightbox = null; S.ui.newStation = null; renderOverlay(); break;
+    case "photo-del": S.ui.lightbox = null; await removePhoto(id); toast("Foto gelöscht"); break;
+    case "year": S.view.year = Number(v); render(); break;
+    case "insp-start": {
+      const nid = uid();
+      const last = Object.values(S.data.inspections).filter((i) => i.sid === st.id && i.mess).sort((a, b) => b.jahr - a.jahr)[0];
+      const mb = (p) => ({ mb: (last && last.mess[p] && last.mess[p].mb) || "", mw: "", anm: "" });
+      put("inspections", nid, { id: nid, sid: st.id, jahr: S.view.year, datum: todayISO(), pruefer: S.myName || ls.get("sb.name") || "", status: "offen", results: {}, mess: { R: mb("R"), S: mb("S"), T: mb("T"), N: mb("N"), tNow: "", tMax: "", bem: "" } });
+      break;
+    }
+    case "res": {
+      const ins = curIns; if (!ins) break;
+      ins.results = ins.results || {};
+      const r = ins.results[el.dataset.k] || {};
+      r.s = r.s === v ? null : v;
+      if (r.s === "m" && !r.prio) r.prio = "mittel";
+      ins.results[el.dataset.k] = r;
+      put("inspections", ins.id, ins);
+      if (r.s === "m") setTimeout(() => { const n = document.getElementById("nt-" + slug(el.dataset.k)); if (n) n.focus(); }, 60);
+      break;
+    }
+    case "prio": { const ins = curIns; const r = ins.results[el.dataset.k]; r.prio = v; put("inspections", ins.id, ins); break; }
+    case "insp-close": { const ins = curIns; ins.status = "abgeschlossen"; ins.closedAt = todayISO(); put("inspections", ins.id, ins); toast(`Inspektion ${ins.jahr} abgeschlossen`); break; }
+    case "insp-reopen": { const ins = curIns; ins.status = "offen"; delete ins.closedAt; put("inspections", ins.id, ins); break; }
+    case "exp-csv": if (curIns) exportInspCSV(st, curIns); break;
+    case "exp-html": if (curIns) exportInspHTML(st, curIns); break;
+    case "exp-all": exportAllCSV(); break;
+    case "new-station": S.ui.newStation = { name: "" }; renderOverlay(); break;
+    case "ab-add": S.ui.stDraft.abgaenge = [...(S.ui.stDraft.abgaenge || []), ""]; render(); setTimeout(() => { const i = document.getElementById("sd-ab-" + (S.ui.stDraft.abgaenge.length - 1)); if (i) i.focus(); }, 40); break;
+    case "ab-del": S.ui.stDraft.abgaenge.splice(Number(el.dataset.i), 1); render(); break;
+    case "st-del": S.ui.confirmDel = true; render(); break;
+    case "st-del-no": S.ui.confirmDel = false; render(); break;
+    case "st-del-yes": {
+      const sid = st.id; S.ui.confirmDel = false;
+      for (const [col] of [["log"], ["inspections"]]) for (const x of Object.values(S.data[col])) if (x.sid === sid) del(col, x.id);
+      for (const p of Object.values(S.data.photos)) if (p.sid === sid) await removePhoto(p.id);
+      await del("stations", sid); go({ name: "list" }); toast("Station gelöscht"); break;
+    }
+    case "clear-demo": clearDemo(); break;
+  }
+});
+
+document.addEventListener("change", async (ev) => {
+  const t = ev.target;
+  if (t.dataset.act === "done") {
+    const ins = S.data.inspections[t.dataset.ins]; const r = ins.results[t.dataset.k];
+    r.done = t.checked; if (t.checked) r.doneAt = todayISO(); else delete r.doneAt;
+    put("inspections", ins.id, ins); toast(t.checked ? "Als erledigt markiert" : "Wieder offen"); return;
+  }
+  if (t.dataset.upload) {
+    const files = [...(t.files || [])]; if (!files.length) return;
+    const st = S.data.stations[S.view.sid];
+    if (t.dataset.upload === "folder") await addPhotos(files, st.id, S.view.folder);
+    else {
+      const ins = inspFor(st.id, S.view.year); const key = t.dataset.k;
+      const label = template(st).flatMap((g) => g.items).find((i) => i.key === key);
+      const ids = await addPhotos(files, st.id, "Mängel", { caption: label ? label.label : "", insp: ins.id, key });
+      const r = ins.results[key]; r.photos = [...(r.photos || []), ...ids]; put("inspections", ins.id, ins);
+    }
+    t.value = ""; return;
+  }
+  const st = S.data.stations[S.view.sid]; const ins = st && inspFor(st.id, S.view.year);
+  if (t.dataset.ins && ins) { ins[t.dataset.ins] = t.value; put("inspections", ins.id, ins, { quiet: true }); return; }
+  if (t.dataset.note && ins) { ins.results[t.dataset.note].note = t.value; put("inspections", ins.id, ins, { quiet: true }); return; }
+  if (t.dataset.mess && ins) { put("inspections", ins.id, ins); return; }
+  if (t.dataset.caption) { const p = S.data.photos[t.dataset.caption]; p.caption = t.value; put("photos", p.id, p, { quiet: true }); return; }
+  if (t.dataset.bind && t.type === "checkbox") { setPath(S.ui, t.dataset.bind, t.checked); }
+  if (t.dataset.bind && t.tagName === "SELECT") { setPath(S.ui, t.dataset.bind, t.value); }
+});
+
+document.addEventListener("input", (ev) => {
+  const t = ev.target;
+  if (t.dataset.bind && t.type !== "checkbox") { setPath(S.ui, t.dataset.bind, t.value); if (t.dataset.bind === "q") render(); return; }
+  const st = S.data.stations[S.view.sid]; const ins = st && inspFor(st.id, S.view.year);
+  if (t.dataset.mess && ins) {
+    ins.mess = ins.mess || {};
+    const [p, f] = t.dataset.mess.split(".");
+    if (f) { ins.mess[p] = ins.mess[p] || {}; ins.mess[p][f] = t.value; } else ins.mess[p] = t.value;
+    if (f === "mw") render(); // Auslastung live
+  }
+  if (t.dataset.note && ins) { ins.results[t.dataset.note].note = t.value; }
+});
+
+document.addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const f = ev.target.dataset.form;
+  if (f === "log") {
+    const d = S.ui.draft;
+    if (!d.name.trim()) { toast("Bitte Namen eintragen"); document.getElementById("lg-name").focus(); return; }
+    const id = uid();
+    ls.set("sb.name", d.name.trim()); ls.set("sb.firma", d.firma.trim());
+    put("log", id, { id, sid: S.view.sid, datum: d.datum, von: d.von, bis: d.bis, name: d.name.trim(), firma: d.firma.trim(), grund: d.grund, text: d.text.trim(), ok: !!d.ok, ts: new Date().toISOString(), uid: S.myId || null });
+    S.ui.logOpen = false; toast("Eingetragen – danke!");
+  } else if (f === "station") {
+    const d = S.ui.stDraft; if (!d.name.trim()) return;
+    d.name = d.name.trim(); d.abgaenge = (d.abgaenge || []).map((a) => a.trim()).filter(Boolean);
+    put("stations", d.id, clone(d)); S.ui.stDraft = null; toast("Stammdaten gespeichert");
+  } else if (f === "newstation") {
+    const name = S.ui.newStation.name.trim().toUpperCase(); if (!name) return;
+    let id = slug(name); if (S.data.stations[id]) id += "-" + uid().slice(-4);
+    put("stations", id, { id, name, nr: "", typ: "", ort: "", trafoInv: "", kva: "", stufe: "", ms: "", abgaenge: [], dk: false, gps: "", notiz: "" });
+    S.ui.newStation = null; go({ name: "station", sid: id, tab: "daten" });
+  }
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && (S.ui.lightbox || S.ui.newStation)) { S.ui.lightbox = null; S.ui.newStation = null; renderOverlay(); } });
+
+/* ---------- Beispieldaten (nur lokaler Modus) ---------- */
+const STATION_NAMES = ["AURACHKIRCHEN", "AURACHKIRCHEN INDUSTRIE", "AURACHKIRCHEN MIBA", "AURACHKIRCHEN ORT", "BRAUCHING", "DESSELBRUNN GEWERBEGEBIET", "DESSELBRUNN HAMET", "DESSELBRUNN LAGERHAUS", "DEUTENHAM", "EHRENFELD", "GROSSREITH", "HATTENBERG"];
+function baseStations() {
+  const out = {};
+  for (const name of STATION_NAMES) { const id = slug(name); out[id] = { id, name, nr: "", typ: "", ort: "", trafoInv: "", kva: "", stufe: "", ms: "", abgaenge: [], dk: false, gps: "", notiz: "" }; }
+  Object.assign(out.aurachkirchen, { trafoInv: "6457", kva: "630", stufe: "3", ms: "36 kV", abgaenge: ["HAFENDORF", "LOIBLEDT", "AURACHKIRCHEN MIBA", "PINSDORF STERNBERG"], dk: true });
+  return out;
+}
+function demoImage(kind) {
+  const c = { station: ["#7d8a96", "#c9a66b", "Außenansicht"], trafo: ["#41566b", "#9fb0c3", "Transformator"], ms: ["#2f4a66", "#d8dee6", "MS-Anlage"], rost: ["#6b4a33", "#c98a4b", "Mangel: Rost Tür"] }[kind] || ["#555", "#999", "Foto"];
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="${c[0]}"/><rect x="90" y="70" width="220" height="170" rx="6" fill="${c[1]}" opacity=".85"/><rect x="120" y="110" width="70" height="130" fill="${c[0]}" opacity=".6"/><rect x="215" y="110" width="65" height="40" fill="${c[0]}" opacity=".5"/><path d="M240 165l-14 22h10l-4 18 16-25h-10z" fill="#f2b705"/><text x="200" y="40" fill="#fff" font-family="Arial" font-size="20" text-anchor="middle">Beispielfoto · ${c[2]}</text></svg>`;
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+}
+function seedDemo() {
+  const d = { stations: baseStations(), log: {}, photos: {}, inspections: {} };
+  const L = (sid, datum, von, bis, name, firma, grund, text, ok = true) => { const id = uid() + Object.keys(d.log).length; d.log[id] = { id, sid, datum, von, bis, name, firma, grund, text, ok, ts: datum }; };
+  L("aurachkirchen", "2026-05-20", "08:10", "09:05", "Max Beispiel", "Netzbetrieb (Beispiel)", "Messung / Ablesung", "Amperemeter abgelesen, Schleppzeiger zurückgesetzt.");
+  L("aurachkirchen", "2026-09-14", "13:30", "14:20", "Anna Muster", "Netzbetrieb (Beispiel)", "Störung", "NS-Abgang 4 Sicherung 160 A getauscht.");
+  L("aurachkirchen", "2026-11-03", "09:00", "11:15", "Max Beispiel", "Netzbetrieb (Beispiel)", "Inspektion", "Jahresinspektion begonnen, Tür klemmt.");
+  L("deutenham", "2026-06-02", "10:00", "11:30", "Anna Muster", "Netzbetrieb (Beispiel)", "Inspektion", "Jahresinspektion durchgeführt, ohne Befund.");
+  L("desselbrunn-hamet", "2026-10-21", "07:45", "08:15", "Firma Beispielbau", "Fremdfirma", "Reinigung", "Laub vor Lüftungsgittern entfernt.", false);
+  const P = (sid, folder, demo, caption) => { const id = "demo-" + demo + "-" + Object.keys(d.photos).length; d.photos[id] = { id, sid, folder, demo, caption, ts: "2026-05-20T09:00:00Z", by: "Beispiel" }; return id; };
+  P("aurachkirchen", "Außenansicht", "station", "Zufahrt Nordseite");
+  P("aurachkirchen", "Transformator", "trafo", "Typenschild Trafo 6457");
+  P("aurachkirchen", "MS-Anlage", "ms", "MS-Schaltanlage 36 kV");
+  const rost = P("aurachkirchen", "Mängel", "rost", "Türen & Schlösser");
+  const st = d.stations.aurachkirchen; const res = {};
+  template(st).forEach((g) => g.items.forEach((it, i) => { if (g.k === "bau" || g.k === "ms" || (g.k === "tr" && i < 3)) res[it.key] = { s: "ok" }; }));
+  res["bau/turen-schlosser"] = { s: "m", prio: "hoch", note: "Tür klemmt, Schloss verrostet – Tür lässt sich nur schwer versperren", photos: [rost] };
+  res["bau/dach"] = { s: "m", prio: "mittel", note: "Dachrinne verstopft, Moos auf Dachfläche" };
+  res["ms/kurzschlussanzeiger"] = { s: "m", prio: "gering", note: "Anzeiger L-Ab LOIBLEDT Display schwach – beobachten" };
+  d.inspections.i1 = { id: "i1", sid: "aurachkirchen", jahr: YEAR, datum: "2026-11-03", pruefer: "Max Beispiel", status: "offen", results: res,
+    mess: { R: { mb: "1000", mw: "300", anm: "" }, S: { mb: "1000", mw: "300", anm: "" }, T: { mb: "1000", mw: "200", anm: "" }, N: { mb: "", mw: "", anm: "kme" }, tNow: "30", tMax: "30", bem: "" } };
+  const de = d.stations.deutenham; const res2 = {};
+  template(de).forEach((g) => g.items.forEach((it) => { res2[it.key] = { s: "ok" }; }));
+  res2["ns/beschriftung-der-abgange"] = { s: "m", prio: "gering", note: "Beschriftung Abgang 2 verblasst", done: true, doneAt: "2026-06-20" };
+  d.inspections.i2 = { id: "i2", sid: "deutenham", jahr: YEAR, datum: "2026-06-02", pruefer: "Anna Muster", status: "abgeschlossen", closedAt: "2026-06-02", results: res2, mess: {} };
+  return d;
+}
+function clearDemo() {
+  S.data = { stations: baseStations(), log: {}, photos: {}, inspections: {} };
+  S.demo = false; ls.set("sb.demo", false); persistLocal(); toast("Beispiele gelöscht – die Stationen bleiben"); go({ name: "list" });
+}
+
+/* ---------- Start ---------- */
+async function startLocal() {
+  S.mode = "local";
+  const saved = ls.get(LS_KEY);
+  if (saved && saved.stations) { S.data = Object.assign({ stations: {}, log: {}, photos: {}, inspections: {} }, saved); S.demo = ls.get("sb.demo") !== false && Object.values(S.data.photos).some((p) => p.demo); }
+  else { S.data = seedDemo(); S.demo = true; ls.set("sb.demo", true); persistLocal(); }
+  try { const blobs = await idb.all(); for (const [k, b] of Object.entries(blobs)) S.localPhotoURL[k] = URL.createObjectURL(b); } catch {}
+  fromHash(); render();
+}
+async function startDb(db) {
+  S.mode = "db"; S.db = db;
+  let pending = new Set(COLS);
+  const timer = setTimeout(() => { if (pending.size) { pending.clear(); render(); toast("Daten werden noch geladen …"); } }, 10000);
+  for (const col of COLS) {
+    db.collection(col).onSnapshot((snap) => {
+      const next = {}; snap.docs.forEach((doc) => { next[doc.id] = Object.assign(clone(doc.data()), { id: doc.id }); });
+      S.data[col] = next;
+      if (pending.has(col)) { pending.delete(col); if (!pending.size) { clearTimeout(timer); fromHash(); } }
+      if (!pending.size) render();
+    }, (e) => { toast("Verbindung zur Datenbank unterbrochen (" + (e && e.code) + ")"); });
+  }
+}
+(async function boot() {
+  const c = window.claude;
+  if (!c || typeof c.use !== "function") { startLocal(); return; }
+  render();
+  let db = null;
+  try { db = await c.use("db"); } catch {}
+  if (!db) { startLocal(); }
+  else {
+    startDb(db);
+    c.use("assets").then((a) => { S.assets = a; render(); }).catch(() => {});
+    c.use("user").then(async (u) => {
+      if (!u) return; S.user = u;
+      try { S.myId = await u.id(); S.myName = (await u.name()) || ""; } catch {}
+      try { const w = await u.can("data.write"); if (w === false) { S.readOnly = true; render(); } } catch {}
+    }).catch(() => {});
+  }
+  c.use("downloads").then((d) => { S.downloads = d; }).catch(() => {});
+})();
+</script>
