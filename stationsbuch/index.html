@@ -231,6 +231,7 @@ td.num, th.num { text-align: right; font-family: var(--font-data); font-variant-
 .repair td .chip { font-size: 12px; }
 tr.done td { color: var(--muted); }
 tr.done td .what { text-decoration: line-through; }
+.skel { display: block; height: 12px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); }
 .empty { padding: 28px 16px; text-align: center; display: grid; gap: 10px; justify-items: center; color: var(--muted); }
 .empty .icon { width: 38px; height: 38px; stroke-width: 1.3; }
 .empty b { color: var(--fg); font-size: 16px; }
@@ -311,6 +312,7 @@ const ICONS = {
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>',
   lock: '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  meter: '<rect x="4" y="3" width="16" height="18" rx="2"/><rect x="7" y="6" width="10" height="5" rx="1"/><path d="M8 15h.01M12 15h.01M16 15h.01M8 18h8"/>',
 };
 const ic = (n, cls = "") => `<svg class="icon ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ""}</svg>`;
 
@@ -650,11 +652,12 @@ function viewStation(st) {
   const nPh = Object.values(S.data.photos).filter((p) => p.sid === st.id).length;
   const state = stationState(st);
   const stateChip = { due: `<span class="chip">Inspektion ${YEAR} fällig</span>`, wip: `<span class="chip warn">Inspektion ${YEAR} in Arbeit</span>`, done: `<span class="chip ok">${ic("check", "sm")}Inspektion ${YEAR} erledigt</span>` }[state];
-  const tabs = [["buch", "book", "Stationsbuch", nLog], ["fotos", "camera", "Fotos", nPh], ["insp", "clip", "Inspektion", null], ["daten", "sliders", "Stammdaten", null]];
+  const tabs = [["buch", "book", "Stationsbuch", nLog], ["fotos", "camera", "Fotos", nPh], ["zaehler", "meter", "Zähler", null], ["insp", "clip", "Inspektion", null], ["daten", "sliders", "Stammdaten", null]];
   let body = "";
   if (v.tab === "fotos") body = tabFotos(st);
   else if (v.tab === "insp") body = tabInsp(st);
   else if (v.tab === "daten") body = tabDaten(st);
+  else if (v.tab === "zaehler") body = tabZaehler(st);
   else body = tabBuch(st);
   const maps = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(st.gps || ("Trafostation " + st.name + " " + (st.ort || "")));
   return `
@@ -838,6 +841,26 @@ function repairTable(list, withStation) {
     </tr>`).join("")}</tbody></table></div>`;
 }
 
+/* ---------- Zählerdaten (Platzhalter) ----------
+   Die Zählerdaten kommen später über eine API aus SAP.
+   Schlüssel für die Zuordnung: st.sap (Technischer Platz / Equipment aus SAP).
+   Geplant: fetchMeters(st) liefert [{ nr, bez, stand, einheit, datum }]. */
+async function fetchMeters(st) { return null; }
+
+function tabZaehler(st) {
+  const skel = (w) => `<span class="skel" style="width:${w}"></span>`;
+  return `<section class="card pad" style="display:grid;gap:12px">
+    <div class="row-flex"><span class="gicon">${ic("meter")}</span><h2 style="font-family:var(--font-display);font-size:22px">Zählerdaten aus SAP</h2><span class="chip warn">In Vorbereitung</span></div>
+    <p class="muted" style="max-width:65ch">Die Zählerdaten dieser Station werden künftig über eine Schnittstelle direkt aus SAP angezeigt. Hier wird nichts eingetragen – die Daten bleiben in SAP.</p>
+    <div class="row-flex"><span class="label">SAP-Zuordnung</span>${st.sap ? `<span class="chip brand mono">${esc(st.sap)}</span>` : `<span class="chip">noch nicht hinterlegt</span>${S.readOnly ? "" : `<button class="btn ghost sm" data-act="tab" data-v="daten">In Stammdaten eintragen</button>`}`}</div>
+  </section>
+  <section class="card" style="overflow:hidden" aria-label="Vorschau Zählertabelle">
+    <div class="tbl-wrap"><table><thead><tr><th>Zählernummer</th><th>Bezeichnung</th><th class="num">Letzter Stand</th><th>Ablesedatum</th></tr></thead>
+    <tbody>${["70%", "55%", "80%"].map((w) => `<tr><td>${skel("90%")}</td><td>${skel(w)}</td><td class="num">${skel("60%")}</td><td>${skel("70%")}</td></tr>`).join("")}</tbody></table></div>
+    <div class="empty" style="padding-top:12px"><span>Sobald die SAP-Schnittstelle steht, erscheinen hier die Zähler der Station.</span></div>
+  </section>`;
+}
+
 function tabDaten(st) {
   if (!S.ui.stDraft || S.ui.stDraft.id !== st.id) S.ui.stDraft = clone(st);
   const d = S.ui.stDraft; const ro = S.readOnly ? "disabled" : "";
@@ -848,6 +871,7 @@ function tabDaten(st) {
       <label class="field"><span>Stationsnummer</span><input id="sd-nr" type="text" data-bind="stDraft.nr" value="${esc(d.nr || "")}" ${ro}></label>
       <label class="field"><span>Bauart</span><select id="sd-typ" data-bind="stDraft.typ" ${ro}>${["", "Kompaktstation", "Begehbare Station", "Turmstation", "Maststation", "Kabelverteiler"].map((t) => `<option value="${t}" ${d.typ === t ? "selected" : ""}>${t || "– nicht erfasst –"}</option>`).join("")}</select></label>
       <label class="field"><span>Ort / Adresse</span><input id="sd-ort" type="text" data-bind="stDraft.ort" value="${esc(d.ort || "")}" ${ro}></label>
+      <label class="field"><span>SAP Techn. Platz / Equipment</span><input id="sd-sap" type="text" data-bind="stDraft.sap" value="${esc(d.sap || "")}" placeholder="für die Zählerdaten aus SAP" ${ro}></label>
     </div>
     <div class="grid2">
       <label class="field"><span>Trafo Inv.-Nr.</span><input id="sd-inv" type="text" data-bind="stDraft.trafoInv" value="${esc(d.trafoInv || "")}" ${ro}></label>
