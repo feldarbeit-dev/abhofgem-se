@@ -1,0 +1,1082 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>30kV Freischaltplaner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* 30kV Freischaltplaner – Karte links (Plan als Hintergrund + digitalisiertes Netz), Panel rechts mit Schaltfolge. */
+:root {
+  --bg: #f3f5f8; --surface: #ffffff; --surface-2: #f7f9fb; --line: #dde3ea;
+  --fg: #1d2d3e; --muted: #5b6b7d; --accent: #0a6ed1; --accent-soft: #e5f0fb;
+  --ok: #188918; --ok-soft: #e7f4e7; --warn: #c35500; --warn-soft: #fdf0e4;
+  --bad: #d0021b; --bad-soft: #fbe9e9; --dead: #9aa3ad;
+  --sw-on: #1f5fd6; --sw-off: #f2c200;
+  --map-bg: #ffffff;
+  --font-ui: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --radius: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12181f; --surface: #1b232c; --surface-2: #212b36; --line: #2f3b48;
+    --fg: #e6edf4; --muted: #9aa8b7; --accent: #4db1ff; --accent-soft: #15324c;
+    --ok: #5dc35d; --ok-soft: #173319; --warn: #f0a050; --warn-soft: #3a2614;
+    --bad: #ff5c6c; --bad-soft: #3d1a1a; --dead: #6b7682; --map-bg: #e9edf1; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12181f; --surface: #1b232c; --surface-2: #212b36; --line: #2f3b48;
+  --fg: #e6edf4; --muted: #9aa8b7; --accent: #4db1ff; --accent-soft: #15324c;
+  --ok: #5dc35d; --ok-soft: #173319; --warn: #f0a050; --warn-soft: #3a2614;
+  --bad: #ff5c6c; --bad-soft: #3d1a1a; --dead: #6b7682; --map-bg: #e9edf1; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 14px/1.45 var(--font-ui); display: flex; flex-direction: column; overflow: hidden; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+
+header.top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 14px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.brand { display: flex; flex-direction: column; line-height: 1.15; margin-right: 6px; }
+.brand strong { font-size: 15px; }
+.brand span { font-size: 12px; color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.seg button { border: 0; background: transparent; padding: 6px 12px; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: var(--accent); color: #fff; }
+.search { flex: 1 1 220px; max-width: 360px; }
+.search input { width: 100%; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); }
+.viewopts { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.viewopts label { display: inline-flex; align-items: center; gap: 4px; }
+.viewopts input[type=range] { width: 80px; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius); padding: 5px 10px; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.danger { color: var(--bad); }
+.btn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+.edittools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 6px 14px; background: var(--surface-2); border-bottom: 1px solid var(--line); font-size: 13px; }
+.edittools .sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; }
+.edittools[hidden] { display: none; }
+
+main { flex: 1; display: flex; min-height: 0; }
+#mapWrap { position: relative; flex: 1; min-width: 0; background: var(--map-bg); }
+#map { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
+#map.tool-add, #map.tool-line { cursor: crosshair; }
+#map.tool-del { cursor: not-allowed; }
+.legend { position: absolute; left: 10px; bottom: 10px; background: color-mix(in srgb, var(--surface) 92%, transparent); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 10px; font-size: 12px; display: flex; gap: 12px; flex-wrap: wrap; max-width: calc(100% - 20px); }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 1px solid #0003; }
+.legend i.ln { width: 18px; height: 4px; border-radius: 2px; border: 0; }
+.hint { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 5px 12px; border-radius: 20px; font-size: 12px; pointer-events: none; opacity: 0; transition: opacity .2s; white-space: nowrap; max-width: 90%; overflow: hidden; text-overflow: ellipsis; }
+.hint.show { opacity: .92; }
+
+aside#panel { width: 420px; flex: none; background: var(--surface); border-left: 1px solid var(--line); overflow-y: auto; padding: 14px 16px 30px; }
+aside h2 { font-size: 16px; margin: 0 0 4px; }
+aside h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 18px 0 6px; }
+aside p { margin: 6px 0; }
+.muted { color: var(--muted); }
+.mono { font-family: var(--font-data); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.chip { font-size: 12px; padding: 2px 8px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); }
+.chip.bad { background: var(--bad-soft); border-color: transparent; color: var(--bad); }
+.chip.warn { background: var(--warn-soft); border-color: transparent; color: var(--warn); }
+.chip.ok { background: var(--ok-soft); border-color: transparent; color: var(--ok); }
+.box { border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 10px; margin: 8px 0; background: var(--surface-2); font-size: 13px; }
+.box.warn { background: var(--warn-soft); border-color: transparent; color: var(--warn); }
+.box.bad { background: var(--bad-soft); border-color: transparent; color: var(--bad); }
+.opt { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; font-size: 13px; }
+.opt label { display: flex; gap: 6px; align-items: flex-start; }
+.opt .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+ol.steps { list-style: none; padding: 0; margin: 0; }
+ol.steps li { display: grid; grid-template-columns: 22px 30px 1fr; gap: 6px; align-items: start; padding: 7px 4px; border-bottom: 1px solid var(--line); font-size: 13px; }
+ol.steps li:hover { background: var(--accent-soft); }
+ol.steps li.done { opacity: .5; }
+ol.steps li.done .txt { text-decoration: line-through; }
+ol.steps .no { font-family: var(--font-data); color: var(--muted); text-align: right; padding-top: 2px; }
+ol.steps .act { font-size: 10.5px; font-weight: 700; border-radius: 4px; padding: 2px 0; text-align: center; letter-spacing: .02em; margin-top: 1px; }
+.act.AUS { background: var(--bad); color: #fff; }
+.act.EIN { background: var(--ok); color: #fff; }
+.act.SI, .act.PR, .act.ERD, .act.INF, .act.NS { background: var(--surface-2); border: 1px solid var(--line); color: var(--fg); }
+.act.ERD { background: #6d4c1f; color: #fff; border-color: transparent; }
+ol.steps .txt b { font-weight: 600; }
+ol.steps .sub { display: block; color: var(--muted); font-size: 12px; }
+ol.steps input { margin: 3px 0 0; }
+.phase { font-weight: 600; font-size: 13px; margin: 14px 0 2px; padding-bottom: 3px; border-bottom: 2px solid var(--fg); }
+details.rueck { margin-top: 16px; }
+details.rueck summary { cursor: pointer; font-weight: 600; }
+.actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 14px; }
+
+.form { display: grid; grid-template-columns: 110px 1fr; gap: 6px 8px; align-items: center; font-size: 13px; }
+.form input, .form select { width: 100%; padding: 5px 7px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface-2); }
+.form .full { grid-column: 1 / -1; }
+.swrow { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.feeders { list-style: none; padding: 0; margin: 0; font-size: 13px; }
+.feeders li { display: flex; gap: 8px; align-items: center; padding: 3px 0; }
+.feeders i { width: 18px; height: 4px; border-radius: 2px; display: inline-block; }
+
+/* SVG */
+.e-hit { stroke: transparent; fill: none; vector-effect: non-scaling-stroke; stroke-width: 16px; cursor: pointer; }
+.e-ln { fill: none; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.e-zone { stroke: var(--bad); stroke-width: 9px; opacity: .35; fill: none; vector-effect: non-scaling-stroke; pointer-events: none; stroke-linecap: round; }
+.e-sel { stroke: var(--accent); stroke-width: 10px; opacity: .3; fill: none; vector-effect: non-scaling-stroke; pointer-events: none; stroke-linecap: round; }
+.n { cursor: pointer; }
+.sw { cursor: pointer; stroke: #111; vector-effect: non-scaling-stroke; stroke-width: 1px; }
+.sw.ein { fill: var(--sw-on); }
+.sw.aus { fill: var(--sw-off); }
+.sw.pulse, .n.pulse { stroke: var(--bad); stroke-width: 4px; }
+.lbl { font-family: var(--font-ui); fill: #1d2d3e; paint-order: stroke; stroke: #fff; stroke-linejoin: round; pointer-events: none; vector-effect: non-scaling-stroke; stroke-width: 3px; }
+.badge circle { vector-effect: non-scaling-stroke; stroke: #fff; stroke-width: 1.5px; }
+.badge text { fill: #fff; font-family: var(--font-data); font-weight: 600; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+.draft { fill: none; stroke: var(--accent); stroke-width: 2px; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; pointer-events: none; }
+
+@media (max-width: 860px) {
+  body { overflow: auto; }
+  main { flex-direction: column; }
+  #mapWrap { flex: none; height: 58vh; }
+  aside#panel { width: 100%; border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+  header.top { padding: 8px 16px; }
+  .edittools { padding: 6px 16px; }
+  .legend { font-size: 10.5px; gap: 4px 8px; padding: 3px 6px; left: 6px; bottom: 6px; }
+  .legend .muted { display: none; }
+}
+@media print {
+  header.top, .edittools, #mapWrap, .actions, .opt, .noprint { display: none !important; }
+  body { overflow: visible; display: block; background: #fff; color: #000; }
+  main { display: block; }
+  aside#panel { width: auto; border: 0; overflow: visible; }
+  details.rueck { display: block; }
+  details.rueck > * { display: block; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><strong>30kV Freischaltplaner</strong><span>Netzservice Gmunden</span></div>
+  <div class="seg" id="modeSeg">
+    <button data-mode="switch" class="on">Freischalten</button>
+    <button data-mode="edit">Netz bearbeiten</button>
+  </div>
+  <div class="search"><input id="q" list="qlist" placeholder="Station suchen (Nr. oder Name) …" autocomplete="off"><datalist id="qlist"></datalist></div>
+  <div class="viewopts">
+    <label title="Übersichtsplan im Hintergrund"><input type="checkbox" id="optBg" checked> Plan</label>
+    <input type="range" id="optBgOp" min="0.1" max="1" step="0.05" value="0.5" title="Deckkraft Plan">
+    <label><input type="checkbox" id="optLbl" checked> Beschriftung</label>
+    <button class="btn" id="btnFit">Einpassen</button>
+  </div>
+</header>
+<div class="edittools" id="editTools" hidden>
+  <span class="muted">Werkzeug:</span>
+  <button class="btn tool on" data-tool="select" title="Auswählen, Station verschieben, Schalter antippen = EIN/AUS">Auswählen</button>
+  <button class="btn tool" data-tool="station" title="Klick in Karte = neue Station; Klick auf Leitung = Station einfügen">+ Station</button>
+  <button class="btn tool" data-tool="abzweig" title="T-Abzweig ohne Schalter (Klick auf Leitung teilt sie)">+ Abzweig</button>
+  <button class="btn tool" data-tool="uw" title="Umspannwerk (Einspeisung)">+ UW</button>
+  <button class="btn tool" data-tool="line" title="Station A antippen, ggf. Knickpunkte, dann Station B">Leitung zeichnen</button>
+  <button class="btn tool" data-tool="del" title="Station, Leitung oder Schalter löschen">Löschen</button>
+  <span class="sep"></span>
+  <button class="btn" id="btnUndo" title="Strg+Z">Rückgängig</button>
+  <span class="sep"></span>
+  <button class="btn" id="btnExport">Export JSON</button>
+  <button class="btn" id="btnImport">Import JSON</button>
+  <input type="file" id="fileImport" accept=".json,application/json" hidden>
+  <button class="btn" id="btnSample">Beispielnetz laden</button>
+  <button class="btn danger" id="btnClear">Netz leeren</button>
+</div>
+<main>
+  <div id="mapWrap">
+    <svg id="map" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <image id="bg" href="netzplan-30kv.jpg" x="0" y="0" width="2000" height="1842" opacity="0.5"/>
+      <g id="gZone"></g>
+      <g id="gEdges"></g>
+      <g id="gNodes"></g>
+      <g id="gSw"></g>
+      <g id="gLabels"></g>
+      <g id="gBadges"></g>
+      <g id="gTemp"></g>
+    </svg>
+    <div class="legend" id="legend">
+      <span><i style="background:var(--sw-on)"></i>Schalter EIN</span>
+      <span><i style="background:var(--sw-off)"></i>Schalter AUS / Trennstelle</span>
+      <span><i class="ln" style="background:var(--bad)"></i>Freischaltbereich</span>
+      <span><i class="ln" style="background:var(--dead)"></i>spannungslos</span>
+      <span class="muted">Leitungsfarbe = speisender UW-Abgang</span>
+    </div>
+    <div class="hint" id="hint"></div>
+  </div>
+  <aside id="panel"></aside>
+</main>
+
+<script>
+'use strict';
+/* ====================== Konstanten / Zustand ====================== */
+const STORE = 'schaltplan30kv.net.v1';
+const IMG = { w: 2000, h: 1842 };
+const SWKIND = { lts: 'Lasttrennschalter', ls: 'Leistungsschalter', tr: 'Trennschalter' };
+const FEEDER_COLORS = ['#0a6ed1', '#188918', '#8b3fd1', '#c35500', '#007a87', '#b5267b', '#5b7c00', '#9c5a00', '#2e4db3', '#a83232'];
+const $ = s => document.querySelector(s);
+const svg = $('#map');
+
+let net;                 // { version, nodes:[], edges:[] }
+let IX;                  // Index
+let mode = 'switch';     // 'switch' | 'edit'
+let tool = 'select';
+let sel = null;          // Auswahl im Editor {type:'node'|'edge', id}
+let target = null;       // Freischalt-Ziel {type:'node'|'edge', id}
+let plan = null;
+let lineDraft = null;    // {from, pts:[[x,y]]}
+let mouse = null;
+let undoStack = [];
+const opts = { stationMode: 'full', ring: false, view: 'after' };
+const done = new Set();  // abgehakte Schritte
+let vb = { x: 0, y: 0, w: IMG.w, h: IMG.h };
+
+/* ====================== Beispielnetz (Ausschnitt Altmünster / Traunkirchen) ====================== */
+function sampleNet() {
+  // [id, nr, name, typ, x, y]  – Koordinaten = Pixel im Übersichtsplan
+  const N = [
+    ['uwg', '', 'UW Gmunden', 'uw', 672, 924],
+    ['s4403276', '4403276', 'Altmünster Leitenstr.', 'station', 557, 1016],
+    ['s4403277', '4403277', 'Altmünster Kalscheckstr.', 'station', 576, 1030],
+    ['s4403245', '4403245', 'Altmünster Wasenhof', 'station', 556, 1055],
+    ['s4403246', '4403246', 'Altmünster Nussbaumhof', 'station', 537, 1070],
+    ['s4403211', '4403211', 'Altmünster Nuesserfeld', 'station', 551, 1084],
+    ['s4403235', '4403235', 'Altmünster Eck', 'station', 510, 1085],
+    ['s4403238', '4403238', 'Altmünster Kalvarienberg', 'station', 497, 1112],
+    ['s4403247', '4403247', 'Altmünster Hocheck 2', 'station', 480, 1126],
+    ['s4403233', '4403233', 'Altmünster Hocheck 1', 'station', 490, 1144],
+    ['s4403212', '4403212', 'Altmünster Seebachviertel', 'station', 610, 1090],
+    ['s4403239', '4403239', 'Altmünster Asgent', 'station', 639, 1074],
+    ['s4403221', '4403221', 'Altmünster Altenwohnheim', 'station', 573, 1110],
+    ['s4403222', '4403222', 'Altmünster Pfarrhof', 'station', 559, 1127],
+    ['s4403210', '4403210', 'Altmünster Schule', 'station', 543, 1132],
+    ['s4403294', '4403294', 'Altmünster Gmeinhofer', 'station', 515, 1128],
+    ['s4403278', '4403278', 'Altmünster Teichweissweg', 'station', 567, 1152],
+    ['s4403288', '4403288', 'Altmünster Hotelfachschule', 'station', 543, 1172],
+    ['s4403236', '4403236', 'Altmünster Ebenzweier', 'station', 557, 1186],
+    ['s4403243', '4403243', 'Altmünster Nachdemsee', 'station', 580, 1185],
+    ['s4403225', '4403225', 'Altmünster Hochholz', 'station', 616, 1216],
+    ['s4403285', '4403285', 'Altmünster Industrie 1', 'station', 575, 1221],
+    ['s4403207', '4403207', 'Altmünster Industrie 2', 'station', 579, 1236],
+    ['s4403275', '4403275', 'Altmünster Ibichmann', 'station', 545, 1225],
+    ['s4403205', '4403205', 'Altmünster Bahnhof', 'station', 530, 1233],
+    ['s4403213', '4403213', 'Altmünster Säge', 'station', 519, 1204],
+    ['s4403214', '4403214', 'Altmünster Stückbachstr.', 'station', 508, 1158],
+    ['s4403279', '4403279', 'Altmünster Pichlbodar', 'station', 543, 1274],
+    ['a280', '', 'Abzweig 280', 'abzweig', 480, 1165],
+    ['s4403234', '4403234', 'Altmünster Hofstätt', 'station', 469, 1176],
+    ['a270', '', 'Abzweig 270', 'abzweig', 480, 1187],
+    ['s4403248', '4403248', 'Altmünster Huemerhof', 'station', 496, 1187],
+    ['s4403296', '4403296', 'Altmünster i.d. Schlipfing', 'station', 479, 1210],
+    ['s4403230', '4403230', 'Hornberg', 'station', 517, 1330],
+    ['s4403202', '4403202', 'Pueheret', 'station', 584, 1326],
+    ['s4403223', '4403223', 'Pueheret Mitte', 'station', 597, 1353],
+    ['s4403224', '4403224', 'Pueheret Sdlg', 'station', 622, 1352],
+    ['s4403231', '4403231', 'Hamberg', 'station', 537, 1398],
+    ['a240', '', 'Abzweig 240', 'abzweig', 554, 1440],
+    ['s4403264', '4403264', 'Eben', 'station', 479, 1427],
+    ['s4403273', '4403273', 'Altmünster Pesendorf', 'station', 530, 1437],
+    ['s4403250', '4403250', 'Viechtau', 'station', 595, 1445],
+    ['s4403287', '4403287', 'Buchberg Bezirksstraße', 'station', 565, 1474],
+    ['s4403286', '4403286', 'Buchberg Sdlg', 'station', 605, 1475],
+    ['s4403289', '4403289', 'Buchberg Krankenhaus', 'station', 612, 1494],
+    ['s4403284', '4403284', 'Traunkirchen Mitterndorf', 'station', 624, 1515],
+    ['s4403265', '4403265', 'Traunkirchen Feuerwehr', 'station', 641, 1526],
+    ['s4403263', '4403263', 'Traunkirchen', 'station', 686, 1516],
+    ['s4403266', '4403266', 'Steinwinkl', 'station', 624, 1552],
+    ['s4403253', '4403253', 'Hesseberg', 'station', 515, 1490],
+    ['s4403258', '4403258', 'Lindmühle', 'station', 475, 1514],
+    ['a27', '', 'Abzweig 27', 'abzweig', 452, 1523],
+    ['s4403272', '4403272', 'Traunkirchen Eckbauer', 'station', 411, 1534],
+    ['a237', '', 'Abzweig 237', 'abzweig', 565, 1500],
+    ['s4403254', '4403254', 'Buchberg', 'station', 591, 1501],
+    ['a233', '', 'Abzweig 233', 'abzweig', 562, 1537],
+    ['s4403290', '4403290', 'Mühlbachberg Sdlg', 'station', 551, 1539],
+  ];
+  // [a, b, Ltg-Nr, k=Kabel/f=Freileitung, Schalter bei a, Schalter bei b, Knickpunkte]
+  // Schalter: E = LTS EIN, A = LTS AUS (Trennstelle), T = Trennschalter EIN, L = Leistungsschalter EIN, '' = kein Schalter
+  const E = [
+    ['uwg', 's4403276', '308', 'k', 'L', 'E', [[636, 962]]],
+    ['uwg', 's4403235', '300', 'k', 'L', 'E', [[643, 969], [508, 1041]]],
+    ['s4403276', 's4403277', '', 'f', 'E', 'E'],
+    ['s4403277', 's4403245', '', 'f', 'E', 'E'],
+    ['s4403245', 's4403246', '', 'f', 'E', 'E'],
+    ['s4403246', 's4403211', '', 'f', 'E', 'E'],
+    ['s4403211', 's4403235', '', 'f', 'E', 'A'],
+    ['s4403277', 's4403212', '13', 'k', 'E', 'E'],
+    ['s4403212', 's4403239', '', 'f', 'E', ''],
+    ['s4403212', 's4403221', '', 'f', 'E', 'E'],
+    ['s4403221', 's4403222', '', 'f', 'E', 'E'],
+    ['s4403222', 's4403210', '', 'f', 'E', 'E'],
+    ['s4403210', 's4403294', '', 'f', 'E', 'E'],
+    ['s4403294', 's4403238', '', 'f', 'E', 'A'],
+    ['s4403235', 's4403238', '', 'k', 'E', 'E'],
+    ['s4403238', 's4403247', '', 'k', 'E', 'E'],
+    ['s4403247', 's4403233', '', 'k', 'E', 'E'],
+    ['s4403222', 's4403278', '', 'f', 'E', 'E'],
+    ['s4403278', 's4403288', '', 'f', 'E', 'E'],
+    ['s4403288', 's4403236', '', 'f', 'E', 'E'],
+    ['s4403236', 's4403243', '', 'f', 'E', 'E'],
+    ['s4403243', 's4403225', '', 'k', 'E', 'E'],
+    ['s4403225', 's4403285', '', 'f', 'E', 'E'],
+    ['s4403285', 's4403207', '', 'k', 'E', ''],
+    ['s4403285', 's4403275', '', 'f', 'E', 'E'],
+    ['s4403275', 's4403205', '', 'f', 'E', 'E'],
+    ['s4403205', 's4403213', '', 'f', 'E', 'E'],
+    ['s4403213', 's4403214', '', 'f', 'E', 'E'],
+    ['s4403214', 's4403233', '', 'f', 'E', 'A'],
+    ['s4403205', 's4403279', '', 'f', 'E', ''],
+    ['s4403233', 'a280', '', 'k', 'E', ''],
+    ['a280', 's4403234', '280', 'k', '', ''],
+    ['a280', 'a270', '', 'k', '', ''],
+    ['a270', 's4403248', '270', 'k', '', ''],
+    ['a270', 's4403296', '', 'k', '', 'E'],
+    ['s4403296', 's4403230', '', 'k', 'E', 'E'],
+    ['s4403230', 's4403202', '', 'k', 'E', 'E'],
+    ['s4403202', 's4403223', '', 'k', 'E', 'E'],
+    ['s4403223', 's4403224', '', 'f', 'E', ''],
+    ['s4403230', 's4403231', '', 'k', 'E', ''],
+    ['s4403231', 'a240', '', 'k', 'T', ''],
+    ['s4403264', 's4403273', '240', 'k', 'T', 'E'],
+    ['s4403273', 'a240', '240', 'k', 'E', ''],
+    ['a240', 's4403250', '240', 'k', '', ''],
+    ['s4403273', 's4403287', '250', 'f', 'E', 'E'],
+    ['s4403287', 's4403286', '', 'f', 'E', 'E'],
+    ['s4403286', 's4403289', '', 'f', 'E', 'E'],
+    ['s4403289', 's4403284', '', 'f', 'E', 'E'],
+    ['s4403284', 's4403265', '', 'f', 'E', 'E'],
+    ['s4403265', 's4403263', '', 'f', 'E', ''],
+    ['s4403284', 's4403266', '', 'f', 'E', 'A'],
+    ['s4403287', 's4403253', '', 'f', 'E', 'E'],
+    ['s4403253', 's4403258', '', 'f', 'E', ''],
+    ['s4403258', 'a27', '', 'f', '', ''],
+    ['a27', 's4403272', '27', 'f', '', 'E'],
+    ['s4403287', 'a237', '237', 'k', 'E', ''],
+    ['a237', 's4403254', '237', 'k', '', ''],
+    ['a237', 'a233', '', 'k', '', ''],
+    ['a233', 's4403290', '233', 'k', '', ''],
+    ['a233', 's4403266', '233', 'f', '', 'E'],
+  ];
+  const swOf = c => ({ E: { t: 'lts', state: 'ein' }, A: { t: 'lts', state: 'aus' }, T: { t: 'tr', state: 'ein' }, L: { t: 'ls', state: 'ein' } }[c] || null);
+  return {
+    version: 1,
+    nodes: N.map(([id, nr, name, type, x, y]) => ({ id, nr, name, type, x, y, trafo: type === 'station' })),
+    edges: E.map(([a, b, label, k, sa, sb, pts], i) => ({ id: 'e' + (i + 1), a, b, label, kind: k === 'f' ? 'freileitung' : 'kabel', swA: swOf(sa), swB: swOf(sb), pts: pts || [] })),
+  };
+}
+
+/* ====================== Persistenz / Undo ====================== */
+function load() {
+  try { const s = localStorage.getItem(STORE); if (s) { const j = JSON.parse(s); if (valid(j)) return j; } } catch (e) { /* ignore */ }
+  return sampleNet();
+}
+function save() { try { localStorage.setItem(STORE, JSON.stringify(net)); } catch (e) { /* ignore */ } }
+function valid(j) { return j && Array.isArray(j.nodes) && Array.isArray(j.edges); }
+function pushUndo() { undoStack.push(JSON.stringify(net)); if (undoStack.length > 60) undoStack.shift(); }
+function undo() { if (!undoStack.length) return hint('Nichts rückgängig zu machen'); net = JSON.parse(undoStack.pop()); changed(); }
+function changed() { reindex(); save(); recompute(); renderAll(); }
+
+/* ====================== Index / Hilfsfunktionen ====================== */
+function reindex() {
+  const byId = new Map(net.nodes.map(n => [n.id, n]));
+  const eById = new Map(net.edges.map(e => [e.id, e]));
+  const adj = new Map(net.nodes.map(n => [n.id, []]));
+  for (const e of net.edges) { adj.get(e.a)?.push({ e, end: 'a' }); adj.get(e.b)?.push({ e, end: 'b' }); }
+  IX = { byId, eById, adj };
+  if (sel && !(sel.type === 'node' ? byId.has(sel.id) : eById.has(sel.id))) sel = null;
+  if (target && !(target.type === 'node' ? byId.has(target.id) : eById.has(target.id))) target = null;
+  refreshSearch();
+}
+const other = end => end === 'a' ? 'b' : 'a';
+const swOf = (e, end) => end === 'a' ? e.swA : e.swB;
+const sid = (e, end) => e.id + ':' + end;
+function isClosed(e, end, st) { const s = swOf(e, end); if (!s) return true; const v = st && st[sid(e, end)]; return (v || s.state) === 'ein'; }
+function lbl(n) { if (!n) return '?'; return (n.nr ? n.nr + ' ' : '') + (n.name || (n.type === 'abzweig' ? 'Abzweig' : 'ohne Name')); }
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function uid(p) { let i = net.nodes.length + net.edges.length + 1, id; do { id = p + (i++); } while (IX.byId.has(id) || IX.eById.has(id)); return id; }
+
+// Richtung eines Leitungsendes beschreiben (über Abzweige hinweg bis zu den nächsten Stationen)
+function dirName(e, end) {
+  const far = IX.byId.get(e[other(end)]);
+  if (!far) return '?';
+  if (far.type !== 'abzweig') return lbl(far);
+  const seen = new Set([far.id]), out = [], q = [far.id], seenE = new Set([e.id]);
+  while (q.length && out.length < 4) {
+    const id = q.shift();
+    for (const x of IX.adj.get(id)) {
+      if (seenE.has(x.e.id)) continue; seenE.add(x.e.id);
+      const n = IX.byId.get(x.e[other(x.end)]);
+      if (!n || seen.has(n.id)) continue; seen.add(n.id);
+      if (n.type === 'abzweig') q.push(n.id); else out.push(lbl(n));
+    }
+  }
+  return (far.name || 'Abzweig') + (out.length ? ' → ' + out.join(', ') : '');
+}
+function swDesc(e, end) {
+  const n = IX.byId.get(e[end]), s = swOf(e, end);
+  return { where: lbl(n), what: `${SWKIND[s?.t] || 'Schalter'} Richtung ${dirName(e, end)}${e.label ? ` (Ltg. ${e.label})` : ''}` };
+}
+function feederName(f) {
+  const e = IX.eById.get(f); if (!e) return '?';
+  const end = IX.byId.get(e.a)?.type === 'uw' ? 'a' : 'b';
+  return `${IX.byId.get(e[end])?.name || 'UW'} · Abgang ${e.label || dirName(e, end)}`;
+}
+function feederUW(f) { const e = IX.eById.get(f); if (!e) return null; return IX.byId.get(e.a)?.type === 'uw' ? e.a : e.b; }
+
+/* ====================== Netzberechnung ====================== */
+// Spannungszustand: von jedem UW-Abgang aus über geschlossene Schalter suchen
+function energize(st) {
+  const node = new Map(), edge = new Map();
+  for (const u of net.nodes) {
+    if (u.type !== 'uw') continue;
+    node.set(u.id, 'UW:' + u.id);
+    for (const { e, end } of IX.adj.get(u.id)) {
+      if (edge.has(e.id) || !isClosed(e, end, st)) continue;
+      const f = e.id, q = [[e, end]];
+      while (q.length) {
+        const [ce, from] = q.pop();
+        if (edge.has(ce.id)) continue;
+        edge.set(ce.id, f);
+        const to = other(from);
+        if (!isClosed(ce, to, st)) continue;
+        const nid = ce[to];
+        if (node.has(nid)) continue;
+        node.set(nid, f);
+        for (const x of IX.adj.get(nid) || []) if (!edge.has(x.e.id) && isClosed(x.e, x.end, st)) q.push([x.e, x.end]);
+      }
+    }
+  }
+  return { node, edge };
+}
+
+// Freischaltbereich: Ziel + alles, was ohne Schalter daran hängt; Grenze = Schalter
+function computeZone(t) {
+  const zN = new Set(), zE = new Set(), bnd = new Map(), warn = [], q = [];
+  const addE = e => { if (e && !zE.has(e.id)) { zE.add(e.id); q.push(e); } };
+  if (t.type === 'node') { zN.add(t.id); IX.adj.get(t.id).forEach(x => addE(x.e)); } else addE(IX.eById.get(t.id));
+  while (q.length) {
+    const e = q.pop();
+    for (const end of ['a', 'b']) {
+      const nid = e[end];
+      if (zN.has(nid)) continue;
+      if (swOf(e, end)) { bnd.set(sid(e, end), { e, end }); continue; }
+      const n = IX.byId.get(nid);
+      if (n.type === 'uw') { warn.push(`Leitung ${dirName(e, other(end))} hat im ${lbl(n)} keinen Schalter eingetragen – Abgangsschalter im Editor ergänzen.`); continue; }
+      zN.add(nid); IX.adj.get(nid).forEach(x => addE(x.e));
+    }
+  }
+  return { zN, zE, bnd: [...bnd.values()].filter(b => !zN.has(b.e[b.end])), warn };
+}
+
+function makePlan(t) {
+  const tn = t.type === 'node' ? IX.byId.get(t.id) : null;
+  const pre = energize({});
+  if (tn && tn.type === 'station' && opts.stationMode === 'trafo') return trafoPlan(tn, pre);
+
+  const z = computeZone(t);
+  const st = {};
+  const bnd = z.bnd;
+  const toOpen = bnd.filter(b => isClosed(b.e, b.end, {}));
+  const alreadyOpen = bnd.filter(b => !isClosed(b.e, b.end, {}));
+  bnd.forEach(b => st[sid(b.e, b.end)] = 'aus');
+  // in der Station selbst zusätzlich alle Felder öffnen (sichtbare Trennung)
+  const own = [];
+  if (tn && tn.type === 'station') for (const x of IX.adj.get(tn.id)) if (swOf(x.e, x.end) && isClosed(x.e, x.end, {})) own.push(x);
+  own.forEach(o => st[sid(o.e, o.end)] = 'aus');
+
+  const mid = energize(st);
+  const zoneSt = [...z.zN].map(id => IX.byId.get(id)).filter(n => n.type === 'station');
+  const lost = net.nodes.filter(n => n.type === 'station' && pre.node.has(n.id) && !mid.node.has(n.id) && !z.zN.has(n.id));
+
+  // Wiederversorgung: Trennstellen schließen (greedy, größter Gewinn zuerst)
+  const bset = new Set(bnd.map(b => sid(b.e, b.end)));
+  own.forEach(o => bset.add(sid(o.e, o.end)));
+  const cands = [];
+  for (const e of net.edges) {
+    if (z.zE.has(e.id)) continue;
+    for (const end of ['a', 'b']) { const s = swOf(e, end); if (s && s.state === 'aus' && !bset.has(sid(e, end))) cands.push({ e, end }); }
+  }
+  const restore = [], left = new Set(lost.map(n => n.id));
+  let fin = mid;
+  while (left.size) {
+    let best = null, bestG = 0, bestEn = null;
+    for (const c of cands) {
+      if (restore.some(r => r.e === c.e && r.end === c.end)) continue;
+      const en = energize({ ...st, [sid(c.e, c.end)]: 'ein' });
+      let g = 0; for (const id of left) if (en.node.has(id)) g++;
+      if (g > bestG) { bestG = g; best = c; bestEn = en; }
+    }
+    if (!best) break;
+    const fA = pre.node.get(best.e[best.end]) || null;
+    const fB = pre.edge.get(best.e.id) || pre.node.get(best.e[other(best.end)]) || null;
+    const fed = [...left].filter(id => bestEn.node.has(id));
+    restore.push({ ...best, fA, fB, fed, newFeeder: bestEn.node.get(fed[0]) });
+    st[sid(best.e, best.end)] = 'ein';
+    fin = bestEn; fed.forEach(id => left.delete(id));
+  }
+  const unrestored = lost.filter(n => left.has(n.id));
+  const restored = lost.filter(n => !left.has(n.id));
+
+  // Ringschluss-Prüfung
+  const ringInfo = restore.map(r => {
+    const ua = r.fA && feederUW(r.fA), ub = r.fB && feederUW(r.fB);
+    return { r, sameUW: ua && ub && ua === ub, a: r.fA, b: r.fB };
+  });
+  const p = { t, kind: 'net', pre, mid, fin, st, z, toOpen, alreadyOpen, own, restore, ringInfo, zoneSt, lost, restored, unrestored, warn: [...z.warn] };
+  buildSteps(p, tn);
+  return p;
+}
+
+function trafoPlan(n, pre) {
+  const p = { t: { type: 'node', id: n.id }, kind: 'trafo', pre, mid: pre, fin: pre, st: {}, z: { zN: new Set(), zE: new Set(), bnd: [] }, toOpen: [], alreadyOpen: [], own: [], restore: [], ringInfo: [], zoneSt: [], lost: [], restored: [], unrestored: [n], warn: [] };
+  const L = lbl(n);
+  p.phases = [
+    { title: '1 · Vorbereitung', steps: [S('INF', L, 'Abschaltung mit Netzführung abstimmen, betroffene Kunden (NS-Netz dieser Station) informieren')] },
+    { title: '2 · Freischalten', steps: [
+      S('NS', L, 'NS-Hauptschalter / NH-Lasttrennleiste der Trafo-Abgänge AUS (Last abwerfen)'),
+      S('AUS', L, 'Trafofeld: Lasttrennschalter (mit HH-Sicherung) AUS'),
+      S('NS', L, 'NS-seitig trennen – Rückspeisung aus dem NS-Netz (PV, Notstrom) verhindern'),
+    ] },
+    { title: '3 · 5 Sicherheitsregeln', steps: [
+      S('SI', L, 'Trafofeld und NS-Schalter gegen Wiedereinschalten sichern (Sperre, Verbotsschild)'),
+      S('PR', L, 'Spannungsfreiheit allpolig feststellen (MS- und NS-Seite des Trafos)'),
+      S('ERD', L, 'Trafofeld: Erdungsschalter EIN – Trafo MS-seitig geerdet und kurzgeschlossen; NS-seitig Erdungs-/Kurzschließgarnitur setzen'),
+      S('INF', L, 'Benachbarte, unter Spannung stehende Teile (Sammelschiene, Ringkabelfelder) abdecken/abschranken'),
+    ] },
+  ];
+  p.back = [
+    { title: 'R1 · Arbeitsstelle freigeben', steps: [S('INF', L, 'Arbeiten beendet, Personal abgemeldet, Werkzeug entfernt'), S('ERD', L, 'NS-Kurzschließgarnitur entfernen, Erdungsschalter Trafofeld AUS'), S('SI', L, 'Sperren und Schilder entfernen')] },
+    { title: 'R2 · Zuschalten', steps: [S('EIN', L, 'Trafofeld: Lasttrennschalter EIN'), S('NS', L, 'NS-Hauptschalter / NH-Lasttrennleiste EIN – Spannung NS kontrollieren')] },
+  ];
+  return p;
+}
+
+function S(act, where, text, extra) { return { act, where, text, ...(extra || {}) }; }
+const ACTNAME = { AUS: 'AUS', EIN: 'EIN', SI: 'SICH', PR: 'PRÜF', ERD: 'ERDE', INF: 'INFO', NS: 'NS' };
+
+function buildSteps(p, tn) {
+  const ph = [], back = [];
+  const swStep = (act, b, extra) => { const d = swDesc(b.e, b.end); return S(act, d.where, d.what, { sw: sid(b.e, b.end), ...(extra || {}) }); };
+  const sortOpen = arr => [...arr].sort((x, y) => (swOf(x.e, x.end).t === 'tr') - (swOf(y.e, y.end).t === 'tr'));
+  const affected = p.lost.map(lbl);
+
+  // 1 Vorbereitung
+  const prep = [S('INF', 'Netzführung', 'Schaltauftrag abstimmen, Schaltberechtigte/r und Anlagenverantwortliche/r festlegen')];
+  if (p.zoneSt.length) prep.push(S('INF', 'Kunden', `Ohne Versorgung während der Arbeiten: ${p.zoneSt.map(lbl).join(', ')}`));
+  if (!opts.ring && p.restored.length) prep.push(S('INF', 'Kunden', `Kurze Versorgungsunterbrechung beim Umschalten: ${p.restored.map(lbl).join(', ')}`));
+  if (p.unrestored.filter(n => !p.zoneSt.includes(n)).length) prep.push(S('INF', 'Kunden', `Ohne Ersatzversorgung bis zur Rückschaltung: ${p.unrestored.map(lbl).join(', ')}`));
+  if (opts.ring) for (const ri of p.ringInfo) {
+    prep.push(swStep('EIN', ri.r, { note: ri.sameUW ? `Ringschluss ${feederName(ri.a)} ↔ ${feederName(ri.b)} (gleiches UW)` : `ACHTUNG Ringschluss zwischen verschiedenen UW/Abgängen (${ri.a ? feederName(ri.a) : '?'} ↔ ${ri.b ? feederName(ri.b) : '?'}) – Zulässigkeit prüfen!`, warn: !ri.sameUW }));
+  }
+  ph.push({ title: '1 · Vorbereitung' + (opts.ring && p.restore.length ? ' / Umschalten (Ringschluss)' : ''), steps: prep });
+
+  // 2 Freischalten
+  const off = sortOpen(p.toOpen).map(b => swStep('AUS', b, swOf(b.e, b.end).t === 'tr' ? { note: 'Trennschalter – nur lastfrei schalten!', warn: true } : null));
+  p.alreadyOpen.forEach(b => off.push(S('INF', swDesc(b.e, b.end).where, `${swDesc(b.e, b.end).what}: bereits AUS (Trennstelle) – Stellung vor Ort kontrollieren`, { sw: sid(b.e, b.end) })));
+  p.own.forEach(o => off.push(swStep('AUS', o, { note: 'Feld in der freizuschaltenden Station (sichtbare Trennung)' })));
+  if (!off.length) off.push(S('INF', '–', 'Keine Schalthandlung nötig – Bereich ist bereits spannungslos'));
+  ph.push({ title: '2 · Freischalten', steps: off });
+
+  // 3 Wiederversorgung (mit Unterbrechung)
+  if (!opts.ring && p.restore.length) {
+    ph.push({ title: '3 · Wiederversorgung', steps: p.restore.map(r => swStep('EIN', r, { note: `versorgt wieder: ${r.fed.map(id => lbl(IX.byId.get(id))).join(', ')}` })) });
+  }
+  // NS-Seite
+  const ns = p.zoneSt.filter(n => n.trafo).map(n => S('NS', lbl(n), 'NS-seitig trennen (NH-Lasttrennleiste / NS-Hauptschalter AUS) – Rückspeisung aus NS-Netz/PV verhindern'));
+  if (ns.length) ph.push({ title: 'NS-Seite der Stationen im Freischaltbereich', steps: ns });
+
+  // 5 Sicherheitsregeln
+  const sr = [];
+  [...p.toOpen, ...p.alreadyOpen, ...p.own].forEach(b => { const d = swDesc(b.e, b.end); sr.push(S('SI', d.where, `${d.what}: gegen Wiedereinschalten sichern (Antrieb sperren, Verbotsschild)`, { sw: sid(b.e, b.end) })); });
+  sr.push(S('PR', 'Arbeitsstelle', 'Spannungsfreiheit allpolig feststellen (an der Arbeitsstelle bzw. an allen Ausschaltstellen)'));
+  [...p.toOpen, ...p.alreadyOpen].forEach(b => { const d = swDesc(b.e, b.end); sr.push(S('ERD', d.where, `Erdungsschalter im Feld Richtung ${dirName(b.e, b.end)} EIN – erden und kurzschließen`, { sw: sid(b.e, b.end) })); });
+  if ([...p.z.zE].some(id => IX.eById.get(id).kind === 'freileitung')) sr.push(S('ERD', 'Arbeitsstelle', 'Freileitung: zusätzlich Erdungs-/Kurzschließgarnitur an der Arbeitsstelle (in Sichtweite) setzen'));
+  sr.push(S('INF', 'Arbeitsstelle', 'Benachbarte, unter Spannung stehende Teile abdecken oder abschranken – dann Freigabe zur Arbeit'));
+  ph.push({ title: '5 Sicherheitsregeln', steps: sr });
+
+  // Rückschaltung
+  const r1 = [S('INF', 'Arbeitsstelle', 'Arbeiten beendet, Personal abgemeldet, Arbeitserdungen an der Arbeitsstelle entfernt')];
+  [...p.toOpen, ...p.alreadyOpen].reverse().forEach(b => { const d = swDesc(b.e, b.end); r1.push(S('ERD', d.where, `Erdungsschalter im Feld Richtung ${dirName(b.e, b.end)} AUS`, { sw: sid(b.e, b.end) })); });
+  r1.push(S('SI', 'alle Schaltstellen', 'Sperren und Verbotsschilder entfernen'));
+  back.push({ title: 'R1 · Arbeitsstelle freigeben', steps: r1 });
+  const r2 = [];
+  const revRestore = p.restore.slice().reverse().map(r => swStep('AUS', r, { note: 'Normalschaltzustand (Trennstelle) wiederherstellen' }));
+  if (!opts.ring) r2.push(...revRestore);
+  p.own.forEach(o => r2.push(swStep('EIN', o)));
+  sortOpen(p.toOpen).reverse().forEach(b => r2.push(swStep('EIN', b, swOf(b.e, b.end).t === 'tr' ? { note: 'Trennschalter – nur lastfrei schalten!', warn: true } : null)));
+  if (opts.ring) r2.push(...revRestore);
+  back.push({ title: 'R2 · Zuschalten' + (opts.ring ? ' (mit Ringschluss)' : ''), steps: r2 });
+  if (ns.length) back.push({ title: 'R3 · NS-Seite', steps: p.zoneSt.filter(n => n.trafo).map(n => S('NS', lbl(n), 'NS-seitig wieder EIN, Spannung kontrollieren')) });
+
+  p.phases = ph; p.back = back;
+}
+
+/* ====================== Karte / Ansicht ====================== */
+function fitAspect() {
+  const r = svg.getBoundingClientRect(); if (!r.width) return;
+  const asp = r.height / r.width; const cy = vb.y + vb.h / 2; vb.h = vb.w * asp; vb.y = cy - vb.h / 2;
+}
+function applyVB() { fitAspect(); svg.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`); }
+function fitAll() {
+  const r = svg.getBoundingClientRect(); const asp = r.height / r.width || 1;
+  let x0 = 0, y0 = 0, x1 = IMG.w, y1 = IMG.h;
+  if (!$('#optBg').checked && net.nodes.length) { x0 = Math.min(...net.nodes.map(n => n.x)) - 40; x1 = Math.max(...net.nodes.map(n => n.x)) + 40; y0 = Math.min(...net.nodes.map(n => n.y)) - 40; y1 = Math.max(...net.nodes.map(n => n.y)) + 40; }
+  const w = Math.max(x1 - x0, (y1 - y0) / asp);
+  vb = { x: (x0 + x1) / 2 - w / 2, y: (y0 + y1) / 2 - w * asp / 2, w, h: w * asp };
+  applyVB(); renderMap();
+}
+function zoomTo(x, y, w) { vb.w = w; fitAspect(); vb.x = x - vb.w / 2; vb.y = y - vb.h / 2; applyVB(); renderMap(); }
+function toSvg(cx, cy) { const r = svg.getBoundingClientRect(); return { x: vb.x + (cx - r.left) / r.width * vb.w, y: vb.y + (cy - r.top) / r.height * vb.h }; }
+function kpx() { const r = svg.getBoundingClientRect(); return vb.w / (r.width || 1); }
+
+let feederColor = new Map();
+let rafPending = false;
+function renderMap() { if (rafPending) return; rafPending = true; requestAnimationFrame(() => { rafPending = false; drawMap(); }); }
+
+function edgePts(e) { const a = IX.byId.get(e.a), b = IX.byId.get(e.b); return [[a.x, a.y], ...(e.pts || []), [b.x, b.y]]; }
+function swPos(e, end, off) {
+  const P = edgePts(e); const [p0, p1] = end === 'a' ? [P[0], P[1]] : [P[P.length - 1], P[P.length - 2]];
+  const dx = p1[0] - p0[0], dy = p1[1] - p0[1], L = Math.hypot(dx, dy) || 1;
+  const o = Math.min(off, L * 0.45);
+  return { x: p0[0] + dx / L * o, y: p0[1] + dy / L * o, nx: -dy / L, ny: dx / L };
+}
+
+function drawMap() {
+  const k = kpx();
+  const rSt = Math.max(3.2, 4.5 * k), rUw = Math.max(7, 9 * k), rAb = Math.max(1.4, 2.5 * k), rSw = Math.max(2.2, 3.4 * k);
+  const showRes = mode === 'switch' && plan;
+  const en = showRes && opts.view === 'after' ? plan.fin : NORMAL;
+  const zone = showRes && plan.kind === 'net' ? plan.z : null;
+  const stOverride = showRes && opts.view === 'after' ? plan.st : {};
+  const showLbl = $('#optLbl').checked && k < 0.75;
+
+  let zh = '', eh = '', nh = '', sh = '', lh = '', bh = '';
+  for (const e of net.edges) {
+    const P = edgePts(e), d = 'M' + P.map(p => p.join(' ')).join('L');
+    const f = en.edge.get(e.id);
+    const col = f ? (feederColor.get(f) || '#555') : 'var(--dead)';
+    const w = e.kind === 'kabel' ? 2.6 : 2.2;
+    const dash = e.kind === 'freileitung' ? ' stroke-dasharray="7 4"' : '';
+    if (zone && zone.zE.has(e.id)) zh += `<path class="e-zone" d="${d}"/>`;
+    if (mode === 'edit' && sel?.type === 'edge' && sel.id === e.id) zh += `<path class="e-sel" d="${d}"/>`;
+    eh += `<path class="e-ln" d="${d}" stroke="${col}" stroke-width="${w}px"${dash}/><path class="e-hit" d="${d}" data-k="e" data-id="${e.id}"/>`;
+    if (showLbl && e.label) { const m = P[Math.floor((P.length - 1) / 2)], m2 = P[Math.floor((P.length - 1) / 2) + 1]; lh += `<text class="lbl" x="${(m[0] + m2[0]) / 2}" y="${(m[1] + m2[1]) / 2}" font-size="${9 * k}" fill="#555" text-anchor="middle">${esc(e.label)}</text>`; }
+  }
+  for (const n of net.nodes) {
+    const isT = showRes && plan.t.type === 'node' && plan.t.id === n.id;
+    const inZone = zone && zone.zN.has(n.id);
+    const live = en.node.has(n.id);
+    const isSel = mode === 'edit' && sel?.type === 'node' && sel.id === n.id;
+    if (n.type === 'uw') {
+      nh += `<g class="n" data-k="n" data-id="${n.id}"><circle cx="${n.x}" cy="${n.y}" r="${rUw}" fill="#fff" stroke="#111" stroke-width="${rUw * 0.28}"/><circle cx="${n.x}" cy="${n.y}" r="${rUw * 0.45}" fill="#111"/></g>`;
+    } else if (n.type === 'abzweig') {
+      nh += `<circle class="n" data-k="n" data-id="${n.id}" cx="${n.x}" cy="${n.y}" r="${rAb}" fill="${live ? '#333' : 'var(--dead)'}"/>`;
+    } else {
+      const fill = inZone || isT ? 'var(--bad)' : live ? '#111' : 'var(--dead)';
+      nh += `<circle class="n" data-k="n" data-id="${n.id}" cx="${n.x}" cy="${n.y}" r="${rSt}" fill="${fill}" stroke="#fff" stroke-width="${rSt * 0.25}"/>`;
+    }
+    if (isT || isSel) nh += `<circle cx="${n.x}" cy="${n.y}" r="${(n.type === 'uw' ? rUw : rSt) * 2}" fill="none" stroke="${isT ? 'var(--bad)' : 'var(--accent)'}" stroke-width="2px" style="vector-effect:non-scaling-stroke;pointer-events:none"/>`;
+    if (showLbl && (n.nr || n.name) && n.type !== 'abzweig') {
+      const fs = Math.max(4, 10.5 * k);
+      lh += `<text class="lbl" x="${n.x + rSt + 3 * k}" y="${n.y - rSt}" font-size="${fs}"><tspan font-weight="600">${esc(n.nr)}</tspan><tspan x="${n.x + rSt + 3 * k}" dy="${fs * 1.1}">${esc(n.name)}</tspan></text>`;
+    }
+  }
+  const off = (rSt + rSw * 1.25);
+  const badgeFor = new Map();
+  if (showRes) {
+    let i = 0;
+    for (const ph of plan.phases) for (const s of ph.steps) { i++; if (s.sw && (s.act === 'AUS' || s.act === 'EIN') && !badgeFor.has(s.sw)) badgeFor.set(s.sw, { i, act: s.act }); }
+  }
+  for (const e of net.edges) for (const end of ['a', 'b']) {
+    const s = swOf(e, end); if (!s) continue;
+    const id = sid(e, end);
+    const n = IX.byId.get(e[end]);
+    const p = swPos(e, end, n.type === 'uw' ? rUw + rSw * 1.4 : off);
+    const state = (stOverride[id] || s.state);
+    const shape = s.t === 'tr' ? `<rect class="sw ${state}" data-k="s" data-id="${id}" x="${p.x - rSw}" y="${p.y - rSw}" width="${rSw * 2}" height="${rSw * 2}"/>`
+      : s.t === 'ls' ? `<rect class="sw ${state}" data-k="s" data-id="${id}" x="${p.x - rSw}" y="${p.y - rSw}" width="${rSw * 2}" height="${rSw * 2}" rx="${rSw * 0.4}"/>`
+      : `<circle class="sw ${state}" data-k="s" data-id="${id}" cx="${p.x}" cy="${p.y}" r="${rSw}"/>`;
+    sh += shape;
+    const b = badgeFor.get(id);
+    if (b) {
+      const R = Math.max(5, 7.5 * k), bx = p.x + p.nx * (rSw + R + 1 * k), by = p.y + p.ny * (rSw + R + 1 * k);
+      bh += `<g class="badge"><circle cx="${bx}" cy="${by}" r="${R}" fill="${b.act === 'AUS' ? 'var(--bad)' : 'var(--ok)'}"/><text x="${bx}" y="${by}" font-size="${R * 1.15}">${b.i}</text></g>`;
+    }
+  }
+  $('#gZone').innerHTML = zh; $('#gEdges').innerHTML = eh; $('#gNodes').innerHTML = nh; $('#gSw').innerHTML = sh; $('#gLabels').innerHTML = lh; $('#gBadges').innerHTML = bh;
+  drawTemp();
+}
+function drawTemp() {
+  let h = '';
+  if (lineDraft) {
+    const a = IX.byId.get(lineDraft.from);
+    const P = [[a.x, a.y], ...lineDraft.pts]; if (mouse) P.push([mouse.x, mouse.y]);
+    h = `<path class="draft" d="M${P.map(p => p.join(' ')).join('L')}"/>`;
+  }
+  $('#gTemp').innerHTML = h;
+}
+let NORMAL = { node: new Map(), edge: new Map() };
+function recompute() {
+  NORMAL = energize({});
+  const fs = [...new Set(NORMAL.edge.values())].sort();
+  feederColor = new Map(fs.map((f, i) => [f, FEEDER_COLORS[i % FEEDER_COLORS.length]]));
+  plan = target ? makePlan(target) : null;
+}
+
+/* ====================== Panel ====================== */
+function renderPanel() { $('#panel').innerHTML = mode === 'switch' ? panelSwitch() : panelEdit(); bindPanel(); }
+
+function panelSwitch() {
+  if (!plan) {
+    const st = net.nodes.filter(n => n.type === 'station').length;
+    const fl = [...feederColor.keys()].map(f => { const c = [...NORMAL.node.entries()].filter(([id, x]) => x === f && IX.byId.get(id).type === 'station').length; return `<li><i style="background:${feederColor.get(f)}"></i>${esc(feederName(f))} <span class="muted">· ${c} Stationen</span></li>`; }).join('');
+    const dead = net.nodes.filter(n => n.type === 'station' && !NORMAL.node.has(n.id));
+    return `<h2>Freischaltung planen</h2>
+      <p>Tippe in der Karte auf eine <b>Leitung</b> (Leitungsabschnitt) oder eine <b>Station</b>, die freigeschaltet werden soll – oder suche oben nach Nummer/Name.</p>
+      <p class="muted">Die App ermittelt die nötigen Ausschaltstellen, die Wiederversorgung über Trennstellen und erstellt die Schaltfolge inkl. 5 Sicherheitsregeln und Rückschaltung.</p>
+      <h3>Netz im Normalschaltzustand</h3>
+      <div class="chips"><span class="chip">${st} Stationen</span><span class="chip">${net.edges.length} Leitungsabschnitte</span><span class="chip">${countOpen()} Trennstellen</span></div>
+      <ul class="feeders">${fl || '<li class="muted">Kein UW mit Abgang erfasst.</li>'}</ul>
+      ${dead.length ? `<div class="box warn">Im Normalzustand ohne Versorgung (fehlende Verbindung oder Schalter AUS?): ${dead.map(lbl).map(esc).join(', ')}</div>` : ''}
+      <div class="box">Das Netz ist im Bereich <b>Netz bearbeiten</b> erfasst. Das Beispielnetz deckt nur den Bereich UW Gmunden – Altmünster – Traunkirchen ab und wurde aus dem Übersichtsplan abgelesen: Nummern, Namen und Schalter bitte vor Verwendung prüfen und das restliche Netz ergänzen.</div>`;
+  }
+  const p = plan;
+  const tn = p.t.type === 'node' ? IX.byId.get(p.t.id) : null;
+  const te = p.t.type === 'edge' ? IX.eById.get(p.t.id) : null;
+  const title = tn ? `Station ${lbl(tn)}` : `Leitungsabschnitt ${lbl(IX.byId.get(te.a))} – ${lbl(IX.byId.get(te.b))}${te.label ? ` (Ltg. ${te.label})` : ''}`;
+  const nSw = p.phases.flatMap(x => x.steps).filter(s => s.act === 'AUS' || s.act === 'EIN').length;
+  let i = 0;
+  const stepLi = (s, pre) => { const no = pre ? pre + (++i2) : ++i; const key = (pre || '') + no; return `<li data-sw="${s.sw || ''}" data-key="${key}" class="${done.has(key) ? 'done' : ''}"><input type="checkbox" ${done.has(key) ? 'checked' : ''} aria-label="erledigt"><span class="act ${s.act}">${ACTNAME[s.act]}</span><span class="txt"><span class="no mono">${no}.</span> <b>${esc(s.where)}</b> – ${esc(s.text)}${s.note ? `<span class="sub" style="${s.warn ? 'color:var(--warn);font-weight:600' : ''}">${esc(s.note)}</span>` : ''}</span></li>`; };
+  let i2 = 0;
+  const phases = p.phases.map(ph => `<div class="phase">${esc(ph.title)}</div><ol class="steps">${ph.steps.map(s => stepLi(s)).join('')}</ol>`).join('');
+  const backs = p.back.map(ph => `<div class="phase">${esc(ph.title)}</div><ol class="steps">${ph.steps.map(s => stepLi(s, 'R')).join('')}</ol>`).join('');
+  const ringWarn = opts.ring && p.ringInfo.some(r => !r.sameUW);
+  return `<h2>${esc(title)}</h2>
+    <div class="opt noprint">
+      ${tn && tn.type === 'station' ? `<div class="row"><label><input type="radio" name="sm" value="full" ${opts.stationMode === 'full' ? 'checked' : ''}> Ganze Station (MS-Anlage)</label><label><input type="radio" name="sm" value="trafo" ${opts.stationMode === 'trafo' ? 'checked' : ''}> Nur Transformator</label></div>` : ''}
+      ${p.kind === 'net' ? `<label><input type="checkbox" id="optRing" ${opts.ring ? 'checked' : ''}> Ohne Versorgungsunterbrechung umschalten (Trennstelle vorher schließen = Ringschluss)</label>` : ''}
+      <div class="row"><span class="muted">Karte zeigt:</span><span class="seg" id="viewSeg"><button data-v="before" class="${opts.view === 'before' ? 'on' : ''}">Normalzustand</button><button data-v="after" class="${opts.view === 'after' ? 'on' : ''}">Nach Freischaltung</button></span></div>
+    </div>
+    <div class="chips">
+      <span class="chip">${nSw} Schalthandlungen</span>
+      ${p.zoneSt.length ? `<span class="chip bad">${p.zoneSt.length} Station(en) im Freischaltbereich</span>` : ''}
+      ${p.restored.length ? `<span class="chip ${opts.ring ? 'ok' : 'warn'}">${p.restored.length} umgeschaltet${opts.ring ? ' ohne Unterbrechung' : ' (kurze Unterbrechung)'}</span>` : ''}
+      ${p.unrestored.filter(n => !p.zoneSt.includes(n)).length ? `<span class="chip bad">${p.unrestored.filter(n => !p.zoneSt.includes(n)).length} ohne Ersatzversorgung</span>` : ''}
+    </div>
+    ${p.warn.map(w => `<div class="box warn">${esc(w)}</div>`).join('')}
+    ${ringWarn ? `<div class="box warn">Ringschluss zwischen verschiedenen UW bzw. nicht eindeutig zuordenbaren Abgängen – nur nach Freigabe der Netzführung!</div>` : ''}
+    ${p.unrestored.filter(n => !p.zoneSt.includes(n)).length ? `<div class="box bad">Keine Ersatzversorgung möglich für: ${p.unrestored.filter(n => !p.zoneSt.includes(n)).map(lbl).map(esc).join(', ')} – ggf. Notstromaggregat vorsehen.</div>` : ''}
+    <p class="muted noprint" style="font-size:12px">Nummern in der Karte = Schritt-Nr. (rot = AUS, grün = EIN). Schritt antippen/überfahren zeigt den Schalter.</p>
+    ${phases}
+    <details class="rueck" open><summary>Rückschaltung (Normalschaltzustand herstellen)</summary>${backs}</details>
+    <div class="actions">
+      <button class="btn primary" id="btnPrint">Drucken / PDF</button>
+      <button class="btn" id="btnCopy">Als Text kopieren</button>
+      <button class="btn" id="btnReset">Häkchen zurücksetzen</button>
+      <button class="btn" id="btnClose">Auswahl aufheben</button>
+    </div>
+    <p class="muted" style="font-size:12px;margin-top:14px">Vorschlag auf Basis der erfassten Netzdaten (Normalschaltzustand). Ersetzt nicht die Prüfung durch den/die Schaltberechtigte/n und die gültigen Betriebsvorschriften.</p>`;
+}
+function countOpen() { let c = 0; for (const e of net.edges) { if (e.swA?.state === 'aus') c++; if (e.swB?.state === 'aus') c++; } return c; }
+
+function panelEdit() {
+  const tips = {
+    select: 'Station/Leitung antippen zum Bearbeiten. Station ziehen = verschieben. <b>Schalter antippen = EIN ⇄ AUS</b> (Normalschaltzustand).',
+    station: 'In die Karte tippen = neue Station. Auf eine Leitung tippen = Station in die Leitung einfügen.',
+    abzweig: 'Auf eine Leitung tippen = T-Abzweig (ohne Schalter) einfügen, oder frei in die Karte tippen.',
+    uw: 'In die Karte tippen = neues Umspannwerk (Einspeisung).',
+    line: 'Station A antippen → beliebig viele Knickpunkte → Station B antippen. Die Leitung wird von B weitergezeichnet; Esc beendet.',
+    del: 'Station, Leitung oder Schalter antippen = löschen.',
+  };
+  let h = `<h2>Netz bearbeiten</h2><div class="box">${tips[tool]}</div>`;
+  if (sel?.type === 'node') {
+    const n = IX.byId.get(sel.id);
+    h += `<h3>Station / Knoten</h3><div class="form">
+      <label for="fNr">Nummer</label><input id="fNr" value="${esc(n.nr)}" class="mono">
+      <label for="fName">Name</label><input id="fName" value="${esc(n.name)}">
+      <label for="fType">Typ</label><select id="fType">${[['station', 'Trafostation'], ['uw', 'Umspannwerk (Einspeisung)'], ['abzweig', 'Abzweig / Muffe (ohne Schalter)']].map(([v, t]) => `<option value="${v}" ${n.type === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      ${n.type === 'station' ? `<label for="fTrafo">Transformator</label><label style="justify-content:flex-start"><input type="checkbox" id="fTrafo" style="width:auto" ${n.trafo ? 'checked' : ''}> vorhanden (NS-Seite)</label>` : ''}
+      <span class="muted">Position</span><span class="mono muted">${Math.round(n.x)} / ${Math.round(n.y)}</span>
+      </div>
+      <h3>Anschlüsse</h3><ul class="feeders">${IX.adj.get(n.id).map(x => { const s = swOf(x.e, x.end); return `<li><i style="background:${s ? (s.state === 'ein' ? 'var(--sw-on)' : 'var(--sw-off)') : 'var(--dead)'};width:10px;height:10px;border-radius:50%"></i><a href="#" data-goedge="${x.e.id}">${esc(dirName(x.e, x.end))}</a> <span class="muted">${s ? SWKIND[s.t] + ' ' + s.state.toUpperCase() : 'kein Schalter'}</span></li>`; }).join('') || '<li class="muted">keine</li>'}</ul>
+      <div class="actions"><button class="btn danger" id="btnDelSel">Station löschen</button><button class="btn" id="btnTestSel">Freischaltung testen</button></div>`;
+  } else if (sel?.type === 'edge') {
+    const e = IX.eById.get(sel.id);
+    const swCtl = end => { const s = swOf(e, end); const n = IX.byId.get(e[end]); return `<div class="full"><b>${esc(lbl(n))}</b></div>
+      <div class="full swrow"><select data-swt="${end}"><option value="">kein Schalter</option>${Object.entries(SWKIND).map(([v, t]) => `<option value="${v}" ${s?.t === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      <select data-sws="${end}" ${s ? '' : 'disabled'}><option value="ein" ${s?.state === 'ein' ? 'selected' : ''}>EIN (blau)</option><option value="aus" ${s?.state === 'aus' ? 'selected' : ''}>AUS – Trennstelle (gelb)</option></select></div>`; };
+    h += `<h3>Leitungsabschnitt</h3><div class="form">
+      <label for="fLbl">Leitungs-Nr.</label><input id="fLbl" value="${esc(e.label)}" class="mono">
+      <label for="fKind">Art</label><select id="fKind"><option value="kabel" ${e.kind === 'kabel' ? 'selected' : ''}>Kabel</option><option value="freileitung" ${e.kind === 'freileitung' ? 'selected' : ''}>Freileitung</option></select>
+      <div class="full"><h3 style="margin:10px 0 0">Schalter an den Enden</h3></div>
+      ${swCtl('a')}${swCtl('b')}
+      </div>
+      <div class="actions"><button class="btn danger" id="btnDelSel">Leitung löschen</button>${e.pts?.length ? '<button class="btn" id="btnStraight">Knickpunkte entfernen</button>' : ''}<button class="btn" id="btnTestSel">Freischaltung testen</button></div>`;
+  } else {
+    h += `<p class="muted">Nichts ausgewählt.</p>`;
+  }
+  h += `<h3>So wird das Netz erfasst</h3>
+    <ol style="padding-left:18px;margin:4px 0;font-size:13px">
+      <li><b>+ Station</b>: Station an die Stelle des schwarzen Punkts im Plan setzen, Nummer + Name eintragen.</li>
+      <li><b>Leitung zeichnen</b>: von Station zu Station. An Stationen wird automatisch ein Lasttrennschalter (EIN) gesetzt, an Abzweigen keiner.</li>
+      <li>Stichstationen ohne Schalter im Plan: in der Leitung „kein Schalter“ wählen.</li>
+      <li><b>Trennstellen</b> (offene Schalter): Schalter antippen → wird gelb (AUS).</li>
+      <li>Daten werden automatisch im Browser gespeichert – mit <b>Export JSON</b> sichern bzw. an Kollegen weitergeben.</li>
+    </ol>
+    <div class="chips"><span class="chip">${net.nodes.filter(n => n.type === 'station').length} Stationen</span><span class="chip">${net.nodes.filter(n => n.type === 'uw').length} UW</span><span class="chip">${net.edges.length} Leitungen</span><span class="chip">${countOpen()} Trennstellen</span></div>`;
+  return h;
+}
+
+function bindPanel() {
+  const P = $('#panel');
+  P.querySelectorAll('input[name=sm]').forEach(r => r.onchange = () => { opts.stationMode = r.value; done.clear(); recompute(); renderAll(); });
+  const ring = P.querySelector('#optRing'); if (ring) ring.onchange = () => { opts.ring = ring.checked; done.clear(); recompute(); renderAll(); };
+  P.querySelectorAll('#viewSeg button').forEach(b => b.onclick = () => { opts.view = b.dataset.v; renderAll(); });
+  P.querySelectorAll('ol.steps li').forEach(li => {
+    const cb = li.querySelector('input');
+    cb.onchange = () => { cb.checked ? done.add(li.dataset.key) : done.delete(li.dataset.key); li.classList.toggle('done', cb.checked); };
+    li.onmouseenter = () => pulse(li.dataset.sw, true);
+    li.onmouseleave = () => pulse(li.dataset.sw, false);
+    li.onclick = ev => { if (ev.target === cb) return; const sw = li.dataset.sw; if (!sw) return; const [eid, end] = sw.split(':'); const e = IX.eById.get(eid); const n = IX.byId.get(e[end]); zoomTo(n.x, n.y, Math.min(vb.w, 260)); setTimeout(() => pulse(sw, true), 60); setTimeout(() => pulse(sw, false), 1500); };
+  });
+  const on = (id, f) => { const el = P.querySelector('#' + id); if (el) el.onclick = f; };
+  on('btnPrint', () => window.print());
+  on('btnCopy', copyText);
+  on('btnReset', () => { done.clear(); renderPanel(); });
+  on('btnClose', () => { target = null; plan = null; renderAll(); });
+  // Editor
+  const inp = (id, f) => { const el = P.querySelector('#' + id); if (el) el.onchange = () => { pushUndo(); f(el); changed(); }; };
+  if (sel?.type === 'node') {
+    const n = IX.byId.get(sel.id);
+    inp('fNr', el => n.nr = el.value.trim());
+    inp('fName', el => n.name = el.value.trim());
+    inp('fType', el => { n.type = el.value; n.trafo = n.type === 'station'; });
+    inp('fTrafo', el => n.trafo = el.checked);
+  }
+  if (sel?.type === 'edge') {
+    const e = IX.eById.get(sel.id);
+    inp('fLbl', el => e.label = el.value.trim());
+    inp('fKind', el => e.kind = el.value);
+    P.querySelectorAll('[data-swt]').forEach(el => el.onchange = () => { pushUndo(); const end = el.dataset.swt, k = end === 'a' ? 'swA' : 'swB'; e[k] = el.value ? { t: el.value, state: e[k]?.state || 'ein' } : null; changed(); });
+    P.querySelectorAll('[data-sws]').forEach(el => el.onchange = () => { pushUndo(); const k = el.dataset.sws === 'a' ? 'swA' : 'swB'; if (e[k]) e[k].state = el.value; changed(); });
+    on('btnStraight', () => { pushUndo(); e.pts = []; changed(); });
+  }
+  on('btnDelSel', () => { if (!sel) return; pushUndo(); sel.type === 'node' ? delNode(sel.id) : delEdge(sel.id); sel = null; changed(); });
+  on('btnTestSel', () => { target = { ...sel }; setMode('switch'); });
+  P.querySelectorAll('[data-goedge]').forEach(a => a.onclick = ev => { ev.preventDefault(); sel = { type: 'edge', id: a.dataset.goedge }; renderAll(); });
+}
+function pulse(sw, on) { if (!sw) return; svg.querySelectorAll(`[data-id="${CSS.escape(sw)}"]`).forEach(el => el.classList.toggle('pulse', on)); }
+
+function planText() {
+  const p = plan; const lines = [];
+  lines.push('SCHALTFOLGE – ' + $('#panel h2').textContent);
+  lines.push('Erstellt: ' + new Date().toLocaleString('de-AT') + (opts.ring ? '  ·  Umschaltung mit Ringschluss' : ''));
+  let i = 0; for (const ph of p.phases) { lines.push('', ph.title.toUpperCase()); for (const s of ph.steps) lines.push(`${++i}. [${ACTNAME[s.act]}] ${s.where} – ${s.text}${s.note ? ' (' + s.note + ')' : ''}`); }
+  lines.push('', 'RÜCKSCHALTUNG'); let j = 0;
+  for (const ph of p.back) { lines.push('', ph.title.toUpperCase()); for (const s of ph.steps) lines.push(`R${++j}. [${ACTNAME[s.act]}] ${s.where} – ${s.text}${s.note ? ' (' + s.note + ')' : ''}`); }
+  return lines.join('\n');
+}
+async function copyText() { try { await navigator.clipboard.writeText(planText()); hint('Schaltfolge in die Zwischenablage kopiert'); } catch (e) { hint('Kopieren nicht möglich'); } }
+
+/* ====================== Bearbeiten ====================== */
+function delNode(id) { net.edges = net.edges.filter(e => e.a !== id && e.b !== id); net.nodes = net.nodes.filter(n => n.id !== id); }
+function delEdge(id) { net.edges = net.edges.filter(e => e.id !== id); }
+function defaultSw(n) { return n.type === 'station' ? { t: 'lts', state: 'ein' } : n.type === 'uw' ? { t: 'ls', state: 'ein' } : null; }
+function newNode(type, x, y) {
+  const n = { id: uid(type === 'uw' ? 'u' : type === 'abzweig' ? 'a' : 's'), nr: '', name: type === 'uw' ? 'UW ' : type === 'abzweig' ? '' : '', type, x: Math.round(x), y: Math.round(y), trafo: type === 'station' };
+  net.nodes.push(n); IX.byId.set(n.id, n); IX.adj.set(n.id, []);
+  return n;
+}
+function nearestOnEdge(e, p) {
+  const P = edgePts(e); let best = { d: Infinity };
+  for (let i = 0; i < P.length - 1; i++) {
+    const [ax, ay] = P[i], [bx, by] = P[i + 1]; const dx = bx - ax, dy = by - ay; const L2 = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, ((p.x - ax) * dx + (p.y - ay) * dy) / L2)); const x = ax + t * dx, y = ay + t * dy; const d = Math.hypot(p.x - x, p.y - y);
+    if (d < best.d) best = { d, x, y, seg: i };
+  }
+  return best;
+}
+function splitEdge(e, type, p) {
+  const q = nearestOnEdge(e, p);
+  const n = newNode(type, q.x, q.y);
+  const pts = e.pts || [];
+  const e2 = { id: uid('e'), a: n.id, b: e.b, label: e.label, kind: e.kind, swA: defaultSw(n), swB: e.swB, pts: pts.slice(q.seg) };
+  e.b = n.id; e.swB = defaultSw(n); e.pts = pts.slice(0, q.seg);
+  net.edges.push(e2);
+  return n;
+}
+function addEdge(a, b, pts) {
+  const A = IX.byId.get(a), B = IX.byId.get(b);
+  const e = { id: uid('e'), a, b, label: '', kind: 'kabel', swA: defaultSw(A), swB: defaultSw(B), pts: pts.map(p => [Math.round(p[0]), Math.round(p[1])]) };
+  net.edges.push(e); return e;
+}
+
+/* ====================== Interaktion Karte ====================== */
+const ptrs = new Map(); let drag = null;
+function hitOf(el) { const h = el.closest?.('[data-k]'); return h ? { k: h.dataset.k, id: h.dataset.id } : null; }
+svg.addEventListener('pointerdown', ev => {
+  svg.setPointerCapture(ev.pointerId);
+  ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  if (ptrs.size === 2) {
+    const [p1, p2] = [...ptrs.values()];
+    drag = { kind: 'pinch', d0: Math.hypot(p1.x - p2.x, p1.y - p2.y), vb0: { ...vb }, c: toSvg((p1.x + p2.x) / 2, (p1.y + p2.y) / 2), moved: true };
+    return;
+  }
+  const hit = hitOf(ev.target);
+  const nodeDrag = mode === 'edit' && tool === 'select' && hit?.k === 'n';
+  drag = { kind: nodeDrag ? 'node' : 'pan', hit, sx: ev.clientX, sy: ev.clientY, vb0: { ...vb }, moved: false, undone: false };
+});
+svg.addEventListener('pointermove', ev => {
+  mouse = toSvg(ev.clientX, ev.clientY);
+  if (lineDraft) drawTemp();
+  if (!ptrs.has(ev.pointerId)) return;
+  ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  if (!drag) return;
+  if (drag.kind === 'pinch' && ptrs.size === 2) {
+    const [p1, p2] = [...ptrs.values()]; const d = Math.hypot(p1.x - p2.x, p1.y - p2.y) || 1;
+    const r = svg.getBoundingClientRect(); const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+    vb.w = Math.min(6000, Math.max(40, drag.vb0.w * drag.d0 / d)); vb.h = vb.w * r.height / r.width;
+    vb.x = drag.c.x - (mx - r.left) / r.width * vb.w; vb.y = drag.c.y - (my - r.top) / r.height * vb.h;
+    applyVB(); renderMap(); return;
+  }
+  const dx = ev.clientX - drag.sx, dy = ev.clientY - drag.sy;
+  if (!drag.moved && Math.hypot(dx, dy) < 5) return;
+  drag.moved = true;
+  if (drag.kind === 'pan') {
+    const r = svg.getBoundingClientRect();
+    vb.x = drag.vb0.x - dx * drag.vb0.w / r.width; vb.y = drag.vb0.y - dy * drag.vb0.h / r.height; applyVB(); renderMap();
+  } else if (drag.kind === 'node') {
+    if (!drag.undone) { pushUndo(); drag.undone = true; }
+    const n = IX.byId.get(drag.hit.id); n.x = Math.round(mouse.x); n.y = Math.round(mouse.y); renderMap();
+  }
+});
+const endPtr = ev => {
+  ptrs.delete(ev.pointerId);
+  if (!drag) return;
+  if (drag.kind === 'pinch') { if (ptrs.size === 0) drag = null; return; }
+  if (!drag.moved && ev.type === 'pointerup') onClick(drag.hit, toSvg(ev.clientX, ev.clientY));
+  if (drag.kind === 'node' && drag.moved) { save(); recompute(); renderPanel(); }
+  drag = null;
+};
+svg.addEventListener('pointerup', endPtr);
+svg.addEventListener('pointercancel', endPtr);
+svg.addEventListener('wheel', ev => {
+  ev.preventDefault();
+  const p = toSvg(ev.clientX, ev.clientY), f = Math.exp(ev.deltaY * (ev.deltaMode ? 0.05 : 0.0015));
+  const nw = Math.min(6000, Math.max(40, vb.w * f)), s = nw / vb.w;
+  vb.x = p.x - (p.x - vb.x) * s; vb.y = p.y - (p.y - vb.y) * s; vb.w = nw; vb.h *= s; applyVB(); renderMap();
+}, { passive: false });
+svg.addEventListener('contextmenu', ev => { if (lineDraft) { ev.preventDefault(); lineDraft = null; drawTemp(); } });
+
+function onClick(hit, p) {
+  if (mode === 'switch') {
+    if (!hit) return;
+    if (hit.k === 'n') { const n = IX.byId.get(hit.id); if (n.type === 'uw') return hint('Umspannwerk kann hier nicht freigeschaltet werden – Leitung wählen'); target = { type: 'node', id: hit.id }; }
+    else if (hit.k === 'e') target = { type: 'edge', id: hit.id };
+    else if (hit.k === 's') target = { type: 'edge', id: hit.id.split(':')[0] };
+    done.clear(); recompute(); renderAll();
+    if (matchMedia('(max-width: 860px)').matches) $('#panel').scrollIntoView({ behavior: 'smooth' });
+    return;
+  }
+  // Editor
+  if (tool === 'select') {
+    if (hit?.k === 's') { const [eid, end] = hit.id.split(':'); const e = IX.eById.get(eid); const s = swOf(e, end); pushUndo(); s.state = s.state === 'ein' ? 'aus' : 'ein'; sel = { type: 'edge', id: eid }; hint(`Schalter ${s.state.toUpperCase()}`); changed(); return; }
+    sel = hit ? { type: hit.k === 'n' ? 'node' : 'edge', id: hit.id } : null; renderAll(); return;
+  }
+  if (tool === 'station' || tool === 'abzweig' || tool === 'uw') {
+    if (hit?.k === 'n') { sel = { type: 'node', id: hit.id }; renderAll(); return; }
+    pushUndo();
+    const n = (hit?.k === 'e' && tool !== 'uw') ? splitEdge(IX.eById.get(hit.id), tool, p) : newNode(tool, p.x, p.y);
+    sel = { type: 'node', id: n.id }; changed();
+    if (tool !== 'abzweig') setTimeout(() => $('#fNr')?.focus(), 30);
+    return;
+  }
+  if (tool === 'line') {
+    if (hit?.k === 'n') {
+      if (!lineDraft) { lineDraft = { from: hit.id, pts: [] }; hint('Knickpunkte setzen, dann Ziel-Station antippen (Esc = Ende)'); drawTemp(); return; }
+      if (hit.id === lineDraft.from) { lineDraft = null; drawTemp(); return; }
+      pushUndo(); const e = addEdge(lineDraft.from, hit.id, lineDraft.pts); sel = { type: 'edge', id: e.id };
+      lineDraft = { from: hit.id, pts: [] }; changed(); return;
+    }
+    if (lineDraft) { lineDraft.pts.push([p.x, p.y]); drawTemp(); }
+    else hint('Zuerst eine Station antippen');
+    return;
+  }
+  if (tool === 'del' && hit) {
+    pushUndo();
+    if (hit.k === 'n') delNode(hit.id);
+    else if (hit.k === 'e') delEdge(hit.id);
+    else { const [eid, end] = hit.id.split(':'); const e = IX.eById.get(eid); e[end === 'a' ? 'swA' : 'swB'] = null; }
+    changed();
+  }
+}
+
+/* ====================== UI allgemein ====================== */
+let hintT;
+function hint(t) { const h = $('#hint'); h.textContent = t; h.classList.add('show'); clearTimeout(hintT); hintT = setTimeout(() => h.classList.remove('show'), 2200); }
+function setMode(m) {
+  mode = m; lineDraft = null;
+  document.querySelectorAll('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+  $('#editTools').hidden = m !== 'edit';
+  setTool(m === 'edit' ? tool : 'select');
+  recompute(); renderAll();
+  requestAnimationFrame(() => { applyVB(); renderMap(); });
+}
+function setTool(t) {
+  tool = t; lineDraft = null;
+  document.querySelectorAll('.tool').forEach(b => b.classList.toggle('on', b.dataset.tool === t));
+  svg.classList.remove('tool-add', 'tool-line', 'tool-del');
+  if (mode === 'edit') svg.classList.add(t === 'line' ? 'tool-line' : t === 'del' ? 'tool-del' : t === 'select' ? '_' : 'tool-add');
+  drawTemp(); if (mode === 'edit') renderPanel();
+}
+function renderAll() { renderMap(); renderPanel(); }
+function refreshSearch() {
+  $('#qlist').innerHTML = net.nodes.filter(n => n.type !== 'abzweig').map(n => `<option value="${esc(lbl(n))}">`).join('');
+}
+$('#q').addEventListener('change', () => {
+  const v = $('#q').value.trim().toLowerCase(); if (!v) return;
+  const n = net.nodes.find(n => lbl(n).toLowerCase() === v) || net.nodes.find(n => lbl(n).toLowerCase().includes(v));
+  if (!n) return hint('Keine Station gefunden');
+  zoomTo(n.x, n.y, 320);
+  if (mode === 'switch' && n.type !== 'uw') { target = { type: 'node', id: n.id }; done.clear(); recompute(); }
+  else sel = { type: 'node', id: n.id };
+  renderAll(); $('#q').blur();
+});
+document.querySelectorAll('#modeSeg button').forEach(b => b.onclick = () => setMode(b.dataset.mode));
+document.querySelectorAll('.tool').forEach(b => b.onclick = () => setTool(b.dataset.tool));
+$('#optBg').onchange = () => { $('#bg').style.display = $('#optBg').checked ? '' : 'none'; };
+$('#optBgOp').oninput = () => $('#bg').setAttribute('opacity', $('#optBgOp').value);
+$('#optLbl').onchange = renderMap;
+$('#btnFit').onclick = fitAll;
+$('#btnUndo').onclick = undo;
+$('#btnExport').onclick = () => {
+  const blob = new Blob([JSON.stringify(net, null, 1)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `netz-30kv-${new Date().toISOString().slice(0, 10)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$('#btnImport').onclick = () => $('#fileImport').click();
+$('#fileImport').onchange = async () => {
+  const f = $('#fileImport').files[0]; if (!f) return;
+  try { const j = JSON.parse(await f.text()); if (!valid(j)) throw new Error(); pushUndo(); net = j; target = null; sel = null; changed(); hint('Netz importiert'); } catch (e) { hint('Datei ist keine gültige Netzdatei'); }
+  $('#fileImport').value = '';
+};
+$('#btnSample').onclick = () => { if (!confirm('Aktuelles Netz durch das Beispielnetz ersetzen?')) return; pushUndo(); net = sampleNet(); target = null; sel = null; changed(); };
+$('#btnClear').onclick = () => { if (!confirm('Alle Stationen und Leitungen löschen? (Rückgängig möglich)')) return; pushUndo(); net = { version: 1, nodes: [], edges: [] }; target = null; sel = null; changed(); };
+document.addEventListener('keydown', ev => {
+  if (ev.target.matches('input, select, textarea')) return;
+  if (ev.key === 'Escape') { if (lineDraft) { lineDraft = null; drawTemp(); } else if (mode === 'switch' && target) { target = null; plan = null; renderAll(); } }
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z' && mode === 'edit') { ev.preventDefault(); undo(); }
+  if ((ev.key === 'Delete' || ev.key === 'Backspace') && mode === 'edit' && sel) { pushUndo(); sel.type === 'node' ? delNode(sel.id) : delEdge(sel.id); sel = null; changed(); }
+});
+new ResizeObserver(() => { applyVB(); renderMap(); }).observe(svg);
+
+/* ====================== Start ====================== */
+net = load();
+reindex(); recompute();
+renderPanel();
+requestAnimationFrame(() => { const r = svg.getBoundingClientRect(); vb = { x: 380, y: 880, w: 380, h: 380 * r.height / r.width }; applyVB(); renderMap(); });
+</script>
+</body>
+</html>
