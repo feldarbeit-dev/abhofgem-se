@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nachwuchs-Trainer</title>
+  <style>
+    :root {
+      --gruen: #1e7a3c;
+      --text: #333;
+      --text-hell: #555;
+      --rand: #e5e5e5;
+      --hintergrund: #fff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Roboto", "Segoe UI", Arial, sans-serif;
+      color: var(--text);
+      background: var(--hintergrund);
+      line-height: 1.5;
+    }
+
+    .seite {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 32px 16px 48px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.8rem;
+      color: var(--gruen);
+    }
+
+    .einleitung {
+      margin: 0 0 32px;
+      color: var(--text-hell);
+    }
+
+    .trainer-liste {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 28px 40px;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .trainer {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      min-height: 100px;
+    }
+
+    .trainer__bild {
+      flex: 0 0 80px;
+      width: 80px;
+      height: 100px;
+      object-fit: cover;
+      background: #f2f2f2;
+    }
+
+    .trainer__name {
+      margin: 0;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .trainer__funktion {
+      margin: 2px 0 4px;
+      font-size: 0.95rem;
+    }
+
+    .trainer__kontakt {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 2px 0;
+      font-size: 0.95rem;
+    }
+
+    .trainer__kontakt svg {
+      flex: 0 0 14px;
+      width: 14px;
+      height: 14px;
+      fill: var(--text);
+    }
+
+    .trainer__kontakt a {
+      color: var(--gruen);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .trainer__kontakt a:hover,
+    .trainer__kontakt a:focus { text-decoration: underline; }
+
+    @media (max-width: 640px) {
+      .trainer-liste { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!--
+  Icons (einmal definiert, unten mit <use> wiederverwendet)
+-->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="icon-mail" viewBox="0 0 24 24">
+    <path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/>
+  </symbol>
+  <symbol id="icon-handy" viewBox="0 0 24 24">
+    <path d="M16 1H8a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm-4 21a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm4-4H8V4h8v14z"/>
+  </symbol>
+</svg>
+
+<main class="seite">
+  <h1>Nachwuchs-Trainer</h1>
+  <p class="einleitung">Unsere Trainer im Nachwuchsbereich – bei Fragen einfach direkt melden.</p>
+
+  <!--
+    FOTOS: Bilder in den Ordner "bilder/" legen (Dateinamen siehe src).
+    Fehlt ein Foto, wird automatisch das graue Platzhalter-Symbol angezeigt.
+  -->
+  <ul class="trainer-liste">
+
+    <li class="trainer">
+      <img class="trainer__bild" src="bilder/weissmann.jpg" alt="Christian Weissmann" onerror="platzhalter(this)">
+      <div>
+        <p class="trainer__name">Christian Weissmann</p>
+        <p class="trainer__funktion">Trainer U17</p>
+        <p class="trainer__kontakt"><svg aria-hidden="true"><use href="#icon-mail"/></svg><a href="mailto:weissmann0306@gmail.com">weissmann0306@gmail.com</a></p>
+        <p class="trainer__kontakt"><svg aria-hidden="true"><use href="#icon-handy"/></svg><a href="tel:+4369917115617">0699/171 1 56 17</a></p>
+      </div>
+    </li>
+
+    <li class="trainer">
+      <img class="trainer__bild" src="bilder/madlsperger.jpg" alt="Stefan Madlsperger" onerror="platzhalter(this)">
+      <div>
+        <p class="trainer__name">Stefan Madlsperger</p>
+        <p class="trainer__funktion">Trainer U13</p>
+        <p class="trainer__kontakt"><svg aria-hidden="true"><use href="#icon-mail"/></svg><a href="mailto:stefan.madlsperger@gmx.at">stefan.madlsperger@gmx.at</a></p>
+        <p class="trainer__kontakt"><svg aria-hidden="true"><use href="#icon-handy"/></svg><a href="tel:+43664601653603">0664/601 65 36 03</a></p>
+      </div>
+    </li>
+
+    <li class="trainer">
+      <img class="trainer__bild" src="" alt="" onerror="platzhalter(this)">
+      <div>
+        <p class="trainer__name">Sebastian Brunsteiner</p>
+        <p class="trainer__funktion">Co-Trainer U13</p>
+      </div>
+    </li>
+
+    <li class="trainer">
+      <img class="trainer__bild" src="bilder/waldl.jpg" alt="Matthias Waldl" onerror="platzhalter(this)">
+      <div>
+        <p class="trainer__name">Matthias Waldl</p>
+        <p class="trainer__funktion">Trainer U11</p>
+        <p class="trainer__kontakt"><svg aria-hidden="true"><use href="#icon-mail"/></svg><a href="mailto:matthias.waldl@gmx.at">matthias.waldl@gmx.at</a></p>
+        <p class="trainer__kontakt"><svg aria-hidden="true"><use href="#icon-handy"/></svg><a href="tel:+436802336500">0680/233 65 00</a></p>
+      </div>
+    </li>
+
+    <li class="trainer">
+      <img class="trainer__bild" src="" alt="" onerror="platzhalter(this)">
+      <div>
+        <p class="trainer__name">Markus Jedinger</p>
+        <p class="trainer__funktion">Co-Trainer U11</p>
+        <p class="trainer__kontakt"><svg aria-hidden="true"><use href="#icon-mail"/></svg><a href="mailto:m.jedi81@yahoo.de">m.jedi81@yahoo.de</a></p>
+        <p class="trainer__kontakt"><svg aria-hidden="true"><use href="#icon-handy"/></svg><a href="tel:+4367761693699">0677/616 9 36 99</a></p>
+      </div>
+    </li>
+
+    <li class="trainer">
+      <img class="trainer__bild" src="" alt="" onerror="platzhalter(this)">
+      <div>
+        <p class="trainer__name">Thomas Edlmayer</p>
+        <p class="trainer__funktion">Trainer U10</p>
+        <p class="trainer__kontakt"><svg aria-hidden="true"><use href="#icon-mail"/></svg><a href="mailto:edlmayerthomas@gmail.com">edlmayerthomas@gmail.com</a></p>
+        <p class="trainer__kontakt"><svg aria-hidden="true"><use href="#icon-handy"/></svg><a href="tel:+436765129995">0676/512 99 95</a></p>
+      </div>
+    </li>
+
+    <li class="trainer">
+      <img class="trainer__bild" src="" alt="" onerror="platzhalter(this)">
+      <div>
+        <p class="trainer__name">Markus Edlmayer</p>
+        <p class="trainer__funktion">Co-Trainer U10</p>
+        <p class="trainer__kontakt"><svg aria-hidden="true"><use href="#icon-mail"/></svg><a href="mailto:markusedlmayer@gmail.com">markusedlmayer@gmail.com</a></p>
+      </div>
+    </li>
+
+    <li class="trainer">
+      <img class="trainer__bild" src="bilder/grafinger.jpg" alt="Manfred Grafinger" onerror="platzhalter(this)">
+      <div>
+        <p class="trainer__name">Manfred Grafinger</p>
+        <p class="trainer__funktion">Trainer U09</p>
+        <p class="trainer__kontakt"><svg aria-hidden="true"><use href="#icon-mail"/></svg><a href="mailto:m.grafinger@j-altmanninger.at">m.grafinger@j-altmanninger.at</a></p>
+        <p class="trainer__kontakt"><svg aria-hidden="true"><use href="#icon-handy"/></svg><a href="tel:+436645422312">0664/542 23 12</a></p>
+      </div>
+    </li>
+
+    <li class="trainer">
+      <img class="trainer__bild" src="" alt="" onerror="platzhalter(this)">
+      <div>
+        <p class="trainer__name">Matthias Pölzl-Huemer</p>
+        <p class="trainer__funktion">Co-Trainer U09</p>
+        <p class="trainer__kontakt"><svg aria-hidden="true"><use href="#icon-mail"/></svg><a href="mailto:matthiasph86@gmail.com">matthiasph86@gmail.com</a></p>
+      </div>
+    </li>
+
+    <li class="trainer">
+      <img class="trainer__bild" src="" alt="" onerror="platzhalter(this)">
+      <div>
+        <p class="trainer__name">Edvin Bajrektarevic</p>
+        <p class="trainer__funktion">Trainer U07</p>
+        <p class="trainer__kontakt"><svg aria-hidden="true"><use href="#icon-mail"/></svg><a href="mailto:edvin.baj02@gmail.com">edvin.baj02@gmail.com</a></p>
+        <p class="trainer__kontakt"><svg aria-hidden="true"><use href="#icon-handy"/></svg><a href="tel:+436642238038">0664/223 80 38</a></p>
+      </div>
+    </li>
+
+  </ul>
+</main>
+
+<script>
+  // Graues Personen-Symbol, wenn kein Foto vorhanden ist
+  var PLATZHALTER = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100">' +
+    '<rect width="80" height="100" fill="#fff"/>' +
+    '<rect x="24" y="34" width="32" height="32" fill="#ccc"/>' +
+    '<circle cx="40" cy="46" r="7" fill="#fff"/>' +
+    '<path d="M28 66c0-8 6-12 12-12s12 4 12 12z" fill="#fff"/>' +
+    '</svg>'
+  );
+  function platzhalter(img) {
+    img.onerror = null;
+    img.src = PLATZHALTER;
+    img.alt = '';
+  }
+  // Leere src-Attribute lösen nicht in jedem Browser onerror aus
+  document.querySelectorAll('.trainer__bild').forEach(function (img) {
+    if (!img.getAttribute('src')) platzhalter(img);
+  });
+</script>
+
+</body>
+</html>
