@@ -1,0 +1,12 @@
+---
+// Bettet ein Tally-Formular ein (tally.so/r/ID → tally.so/embed/ID).
+import { tallyEmbed } from '../lib/daten';
+interface Props { link: string; titel: string }
+const { link, titel } = Astro.props;
+const embed = tallyEmbed(link);
+---
+{embed && <iframe src={embed} title={titel} loading="lazy"></iframe>}
+<p class="hinweis">
+  {embed ? 'Das Formular wird nicht angezeigt?' : 'Zur Anmeldung:'}
+  <a href={link} rel="noopener">Formular direkt bei Tally öffnen</a>
+</p>

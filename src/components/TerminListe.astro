@@ -1,0 +1,24 @@
+---
+// Liste kommender Termine. Vergangene werden beim Bauen und zusätzlich im Browser ausgeblendet.
+import { type Termin, iso, tagZahl, monatKurz, datumLang, sektion } from '../lib/daten';
+interface Props { termine: Termin[]; nur3?: boolean; leer?: string }
+const { termine, nur3 = false, leer = 'Derzeit sind keine Termine eingetragen.' } = Astro.props;
+---
+<div>
+  <ul class:list={['raster', { 'nur-3': nur3 }]} data-liste hidden={termine.length === 0}>
+    {termine.map((t) => (
+      <li class="karte termin" data-bis={iso(t.data.datum)}>
+        <div class="tag" aria-hidden="true"><b>{tagZahl(t.data.datum)}</b><span>{monatKurz(t.data.datum)}</span></div>
+        <div>
+          {sektion(t.data.sektion) && <span class="marke">{sektion(t.data.sektion)!.name}</span>}
+          <h3><a href={`/termine/${t.id}`}>{t.data.titel}</a></h3>
+          <p>
+            <time datetime={iso(t.data.datum)}>{datumLang(t.data.datum)}</time>{t.data.uhrzeit && `, ${t.data.uhrzeit} Uhr`}
+            {t.data.ort && <><br />{t.data.ort}</>}
+          </p>
+        </div>
+      </li>
+    ))}
+  </ul>
+  <p class="leer" data-leer hidden={termine.length > 0}>{leer}</p>
+</div>

@@ -1,0 +1,29 @@
+name: Sportunion Gschwandt
+kurzname: Union Gschwandt
+slogan: Fünf Sektionen, ein Verein – Bewegung für alle in Gschwandt.
+adresse:
+  strasse: Wallweg 3
+  plz: "4816"
+  ort: Gschwandt bei Gmunden
+zvr: "4091748006"
+email: info@uniongschwandt.at
+obmann: ""
+kartenlink: ""
+facebook: https://www.facebook.com/uniongschwandt
+instagram: ""
+tally:
+  beitritt: ""
+  kontakt: ""
+tarife:
+  - name: Erwachsene
+    preis: bitte eintragen
+    hinweis: pro Jahr
+  - name: Kinder und Jugendliche
+    preis: bitte eintragen
+    hinweis: pro Jahr
+  - name: Familie
+    preis: bitte eintragen
+    hinweis: pro Jahr
+  - name: Unterstützendes Mitglied
+    preis: bitte eintragen
+    hinweis: pro Jahr

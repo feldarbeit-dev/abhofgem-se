@@ -1,0 +1,153 @@
+---
+import '@fontsource-variable/inter';
+import '@fontsource-variable/archivo';
+import '../styles/global.css';
+import { verein, hauptsektionen, untersektionen, sektionPfad, kartenlink } from '../lib/daten';
+
+interface Props { titel?: string; beschreibung?: string; bild?: string }
+const { titel, beschreibung = verein.slogan, bild } = Astro.props;
+const seitentitel = titel ? `${titel} – ${verein.name}` : verein.name;
+const pfad = Astro.url.pathname.replace(/\.html$/, '').replace(/\/$/, '') || '/';
+const aktiv = (href: string) => (href === '/' ? pfad === '/' : pfad === href || pfad.startsWith(href + '/'));
+const aktuell = (href: string, genau = false) => ((genau ? pfad === href : aktiv(href)) ? 'page' : undefined);
+const kanonisch = new URL(pfad, Astro.site);
+---
+<!doctype html>
+<html lang="de-AT">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{seitentitel}</title>
+    <meta name="description" content={beschreibung} />
+    <link rel="canonical" href={kanonisch} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="theme-color" content="#12305c" />
+    <meta property="og:title" content={seitentitel} />
+    <meta property="og:description" content={beschreibung} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={kanonisch} />
+    <meta property="og:locale" content="de_AT" />
+    {bild && <meta property="og:image" content={new URL(bild, Astro.site)} />}
+    <script is:inline>document.documentElement.classList.add('js');</script>
+  </head>
+  <body>
+    <a class="skip" href="#inhalt">Zum Inhalt springen</a>
+    <header class="kopf">
+      <div class="wrap kopf-innen">
+        <a class="logo" href="/" aria-label={`${verein.name} – zur Startseite`}>
+          <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="24" fill="#12305c" /><circle cx="24" cy="24" r="15" fill="none" stroke="#ffc917" stroke-width="5" /><circle cx="24" cy="24" r="5" fill="#fff" /></svg>
+          <span>{verein.kurzname}</span>
+        </a>
+        <button class="menue-knopf" type="button" aria-expanded="false" aria-controls="hauptmenue">Menü</button>
+        <nav class="menue" id="hauptmenue" aria-label="Hauptmenü">
+          <ul>
+            <li><a href="/" aria-current={aktuell('/')}>Start</a></li>
+            <li class="hat-unter">
+              <button class="unter-knopf" type="button" aria-expanded="false" aria-controls="sektionen-menue">
+                Sektionen
+                <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+              </button>
+              <ul class="unter" id="sektionen-menue">
+                {hauptsektionen.map((s) => (
+                  <>
+                    <li><a href={sektionPfad(s)} aria-current={aktuell(sektionPfad(s), true)}>{s.name}</a></li>
+                    {untersektionen(s.slug).map((u) => (
+                      <li class="ebene2"><a href={sektionPfad(u)} aria-current={aktuell(sektionPfad(u), true)}>{u.name}</a></li>
+                    ))}
+                  </>
+                ))}
+              </ul>
+            </li>
+            <li><a href="/termine" aria-current={aktuell('/termine')}>Termine</a></li>
+            <li><a href="/aktuelles" aria-current={aktuell('/aktuelles')}>Aktuelles</a></li>
+            <li><a href="/kontakt" aria-current={aktuell('/kontakt')}>Kontakt</a></li>
+            <li><a class="knopf" href="/mitglied-werden">Mitglied werden</a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main id="inhalt"><slot /></main>
+
+    <footer class="fuss">
+      <div class="wrap">
+        <div class="fuss-raster">
+          <div>
+            <h2>{verein.name}</h2>
+            <address>
+              {verein.adresse.strasse}<br />
+              {verein.adresse.plz} {verein.adresse.ort}<br />
+              <a href={`mailto:${verein.email}`}>{verein.email}</a>
+            </address>
+            <p><a href={kartenlink} rel="noopener">Auf der Karte anzeigen</a></p>
+            <p>ZVR-Zahl: {verein.zvr}</p>
+          </div>
+          <nav aria-label="Sektionen">
+            <h2>Sektionen</h2>
+            <ul>{hauptsektionen.map((s) => <li><a href={sektionPfad(s)}>{s.name}</a></li>)}</ul>
+          </nav>
+          <nav aria-label="Verein">
+            <h2>Verein</h2>
+            <ul>
+              <li><a href="/termine">Termine</a></li>
+              <li><a href="/aktuelles">Aktuelles</a></li>
+              <li><a href="/mitglied-werden">Mitglied werden</a></li>
+              <li><a href="/kontakt">Kontakt</a></li>
+            </ul>
+          </nav>
+          {(verein.facebook || verein.instagram) && (
+            <div>
+              <h2>Social Media</h2>
+              <ul>
+                {verein.facebook && <li><a href={verein.facebook} rel="noopener">Facebook</a></li>}
+                {verein.instagram && <li><a href={verein.instagram} rel="noopener">Instagram</a></li>}
+              </ul>
+            </div>
+          )}
+        </div>
+        <div class="fuss-unten">
+          <span>© {new Date().getFullYear()} {verein.name}</span>
+          <ul>
+            <li><a href="/impressum">Impressum</a></li>
+            <li><a href="/datenschutz">Datenschutz</a></li>
+          </ul>
+        </div>
+      </div>
+    </footer>
+
+    <script is:inline>
+      (() => {
+        // Menü auf dem Handy und Sektionen-Dropdown
+        const knopf = document.querySelector('.menue-knopf');
+        const menue = document.getElementById('hauptmenue');
+        knopf.addEventListener('click', () => {
+          knopf.setAttribute('aria-expanded', String(menue.classList.toggle('offen')));
+        });
+        const unter = document.querySelector('.hat-unter');
+        const unterKnopf = unter.querySelector('.unter-knopf');
+        const setze = (offen) => {
+          unter.classList.toggle('offen', offen);
+          unterKnopf.setAttribute('aria-expanded', String(offen));
+        };
+        unterKnopf.addEventListener('click', () => setze(!unter.classList.contains('offen')));
+        document.addEventListener('click', (e) => { if (!unter.contains(e.target)) setze(false); });
+        unter.addEventListener('focusout', (e) => { if (!unter.contains(e.relatedTarget)) setze(false); });
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && unter.classList.contains('offen')) { setze(false); unterKnopf.focus(); }
+        });
+
+        // Vergangenes ausblenden, auch wenn die Seite seit Tagen nicht neu gebaut wurde.
+        const heute = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Vienna' }).format(new Date());
+        document.querySelectorAll('[data-bis]').forEach((el) => { if (el.dataset.bis < heute) el.remove(); });
+        document.querySelectorAll('[data-vorbei]').forEach((el) => { if (el.dataset.vorbei < heute) el.hidden = false; });
+        document.querySelectorAll('[data-liste]').forEach((liste) => {
+          if (!liste.children.length) {
+            liste.hidden = true;
+            const leer = liste.parentElement.querySelector('[data-leer]');
+            if (leer) leer.hidden = false;
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

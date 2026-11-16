@@ -1,0 +1,19 @@
+---
+import { type Person, telLink } from '../lib/daten';
+interface Props { personen: Person[] }
+const { personen } = Astro.props;
+---
+<ul class="raster">
+  {personen.map((p) => (
+    <li class="karte">
+      <h3>{p.name}</h3>
+      {p.funktion && <p>{p.funktion}</p>}
+      {(p.telefon || p.email) && (
+        <dl class="daten">
+          {p.telefon && <div><dt>Telefon</dt><dd><a href={telLink(p.telefon)}>{p.telefon}</a></dd></div>}
+          {p.email && <div><dt>E-Mail</dt><dd><a href={`mailto:${p.email}`}>{p.email}</a></dd></div>}
+        </dl>
+      )}
+    </li>
+  ))}
+</ul>

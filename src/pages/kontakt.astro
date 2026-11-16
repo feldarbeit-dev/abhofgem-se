@@ -1,0 +1,56 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Seitenkopf from '../components/Seitenkopf.astro';
+import Personen from '../components/Personen.astro';
+import { verein, sektionen, sektion, sektionPfad, kartenlink } from '../lib/daten';
+
+// Ansprechpersonen werden aus den Sektionsdaten gesammelt – sie stehen nur dort.
+const gruppen = sektionen
+  .map((s) => ({ s, eltern: sektion(s.eltern), personen: (s.ansprechpersonen ?? []).filter((p) => p?.name) }))
+  .filter((g) => g.personen.length);
+---
+<Layout titel="Kontakt" beschreibung={`Kontakt und Ansprechpersonen der ${verein.name}.`}>
+  <Seitenkopf titel="Kontakt" text="So erreichst du den Verein und die Sektionen." />
+  <section class="abschnitt">
+    <div class="wrap zweispaltig">
+      <div>
+        <h2>{verein.name}</h2>
+        <address>
+          <p>{verein.adresse.strasse}<br />{verein.adresse.plz} {verein.adresse.ort}</p>
+          <p>E-Mail: <a href={`mailto:${verein.email}`}>{verein.email}</a></p>
+        </address>
+        {verein.obmann && <p>Obmann: {verein.obmann}</p>}
+        <div class="knoepfe">
+          <a class="knopf zweit" href={kartenlink} rel="noopener">Auf der Karte anzeigen</a>
+          {verein.tally?.kontakt
+            ? <a class="knopf" href={verein.tally.kontakt} rel="noopener">Zum Kontaktformular</a>
+            : <a class="knopf" href={`mailto:${verein.email}`}>E-Mail schreiben</a>}
+        </div>
+      </div>
+      {(verein.facebook || verein.instagram) && (
+        <div>
+          <h2>Social Media</h2>
+          <p>Fotos und Kurzmeldungen gibt es auch hier:</p>
+          <ul class="linkliste">
+            {verein.facebook && <li><a class="knopf zweit" href={verein.facebook} rel="noopener">Facebook</a></li>}
+            {verein.instagram && <li><a class="knopf zweit" href={verein.instagram} rel="noopener">Instagram</a></li>}
+          </ul>
+        </div>
+      )}
+    </div>
+  </section>
+
+  {gruppen.length > 0 && (
+    <section class="abschnitt grau" aria-labelledby="t-personen">
+      <div class="wrap">
+        <h2 id="t-personen">Ansprechpersonen der Sektionen</h2>
+        {gruppen.map((g) => (
+          <>
+            <h3 style="margin-top:1.75rem"><a href={sektionPfad(g.s)}>{g.eltern ? `${g.eltern.name} – ${g.s.name}` : g.s.name}</a></h3>
+            <Personen personen={g.personen} />
+          </>
+        ))}
+      </div>
+    </section>
+  )}
+</Layout>

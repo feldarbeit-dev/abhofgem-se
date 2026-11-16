@@ -1,0 +1,18 @@
+---
+import { type Beitrag, iso, datumKurz, sektion } from '../lib/daten';
+interface Props { beitraege: Beitrag[]; leer?: string }
+const { beitraege, leer = 'Noch keine Beiträge vorhanden.' } = Astro.props;
+---
+{beitraege.length === 0 ? <p class="leer">{leer}</p> : (
+  <ul class="raster">
+    {beitraege.map((b) => (
+      <li class="karte">
+        {b.data.bild && <img src={b.data.bild} alt={b.data.bild_alt ?? ''} loading="lazy" />}
+        {sektion(b.data.sektion) && <span class="marke">{sektion(b.data.sektion)!.name}</span>}
+        <h3><a href={`/aktuelles/${b.id}`}>{b.data.titel}</a></h3>
+        <p class="meta"><time datetime={iso(b.data.datum)}>{datumKurz(b.data.datum)}</time></p>
+        {b.data.auszug && <p>{b.data.auszug}</p>}
+      </li>
+    ))}
+  </ul>
+)}

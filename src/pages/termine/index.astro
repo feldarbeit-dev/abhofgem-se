@@ -1,0 +1,11 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Seitenkopf from '../../components/Seitenkopf.astro';
+import TerminListe from '../../components/TerminListe.astro';
+import { kommendeTermine } from '../../lib/daten';
+const termine = await kommendeTermine();
+---
+<Layout titel="Termine" beschreibung="Kommende Veranstaltungen, Kurse und Turniere der Sportunion Gschwandt.">
+  <Seitenkopf titel="Termine" text="Veranstaltungen, Kurse und Turniere – mit Anmeldung direkt beim Termin." />
+  <section class="abschnitt"><div class="wrap"><TerminListe termine={termine} /></div></section>
+</Layout>

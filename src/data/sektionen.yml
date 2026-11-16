@@ -1,0 +1,167 @@
+sektionen:
+  - slug: fussball
+    name: Fußball
+    darstellung: training
+    kurztext: Kampfmannschaft, Reserve und Nachwuchs am Sportplatz Gschwandt.
+    text: |-
+      Die Sektion Fußball ist mit Kampfmannschaft, Reserve und mehreren Nachwuchsteams im Meisterschaftsbetrieb.
+
+      Neue Spielerinnen und Spieler sind jederzeit willkommen – einfach bei einer Ansprechperson melden oder zum Training vorbeikommen.
+    links: []
+    gruppen:
+      - name: Kampfmannschaft und Reserve
+        tag: Dienstag
+        zeit: 19:00–20:30
+        ort: Sportplatz Gschwandt
+        ansprechperson: ""
+        telefon: ""
+        start: ""
+    ansprechpersonen:
+      - name: Bitte eintragen
+        funktion: Sektionsleitung
+        telefon: ""
+        email: ""
+
+  - slug: nachwuchs
+    eltern: fussball
+    name: Nachwuchs
+    darstellung: training
+    kurztext: Fußball für Kinder und Jugendliche – vom Kindergarten bis zur U16.
+    text: |-
+      Im Nachwuchs steht die Freude am Spiel im Mittelpunkt. Die Kinder trainieren in Altersgruppen mit ausgebildeten Trainerinnen und Trainern.
+
+      Ein Schnuppertraining ist jederzeit möglich.
+    links: []
+    gruppen:
+      - name: Kindergarten und U7
+        tag: Mittwoch
+        zeit: 16:30–17:30
+        ort: Sportplatz Gschwandt
+        ansprechperson: ""
+        telefon: ""
+        start: ""
+      - name: U9 und U10
+        tag: Donnerstag
+        zeit: 17:00–18:15
+        ort: Sportplatz Gschwandt
+        ansprechperson: ""
+        telefon: ""
+        start: ""
+    ansprechpersonen:
+      - name: Bitte eintragen
+        funktion: Nachwuchsleitung
+        telefon: ""
+        email: ""
+
+  - slug: stockschuetzen
+    name: Stockschützen
+    darstellung: training
+    kurztext: Stocksport im Sommer und im Winter – gesellig und treffsicher.
+    text: |-
+      Die Stockschützen treffen sich das ganze Jahr über zum Training und nehmen an Turnieren und Meisterschaften teil.
+
+      Wer das Stockschießen ausprobieren möchte, ist herzlich eingeladen. Leihstöcke sind vorhanden.
+    links: []
+    gruppen:
+      - name: Training
+        tag: Freitag
+        zeit: ab 18:00
+        ort: Stockbahnen Gschwandt
+        ansprechperson: ""
+        telefon: ""
+        start: ""
+    ansprechpersonen:
+      - name: Bitte eintragen
+        funktion: Sektionsleitung
+        telefon: ""
+        email: ""
+
+  - slug: tennis
+    name: Tennis
+    darstellung: training
+    kurztext: Freiplätze, Meisterschaft und Kindertraining auf der Tennisanlage.
+    text: |-
+      Auf der Tennisanlage wird von Frühling bis Herbst gespielt – im Hobbybetrieb genauso wie in der Meisterschaft.
+
+      Für Kinder und Jugendliche gibt es in der Saison ein eigenes Training.
+    links: []
+    gruppen:
+      - name: Kinder- und Jugendtraining
+        tag: Montag
+        zeit: 16:00–18:00
+        ort: Tennisanlage Gschwandt
+        ansprechperson: ""
+        telefon: ""
+        start: "2027-04-26"
+    ansprechpersonen:
+      - name: Bitte eintragen
+        funktion: Sektionsleitung
+        telefon: ""
+        email: ""
+
+  - slug: tischtennis
+    name: Tischtennis
+    darstellung: training
+    kurztext: Schnelle Ballwechsel in der Halle – für Hobby und Meisterschaft.
+    text: |-
+      Die Sektion Tischtennis trainiert in der Halle und spielt in der Meisterschaft mit.
+
+      Schläger zum Ausprobieren liegen bereit.
+    links: []
+    gruppen:
+      - name: Training Erwachsene
+        tag: Mittwoch
+        zeit: 19:00–21:00
+        ort: Turnsaal der Volksschule Gschwandt
+        ansprechperson: ""
+        telefon: ""
+        start: ""
+    ansprechpersonen:
+      - name: Bitte eintragen
+        funktion: Sektionsleitung
+        telefon: ""
+        email: ""
+
+  - slug: turnen
+    name: Turnen
+    darstellung: kurse
+    kurztext: Kurse für Kinder und Erwachsene – von Eltern-Kind-Turnen bis Fitgymnastik.
+    text: |-
+      Die Sektion Turnen bietet Kurse für alle Altersgruppen an. Die Kurse laufen während des Schuljahres, in den Ferien ist Pause.
+
+      Die Plätze sind begrenzt. Die Anmeldung läuft über die jeweiligen Termine oder direkt bei der Kursleitung.
+    links: []
+    gruppen:
+      - name: Eltern-Kind-Turnen
+        tag: Montag
+        zeit: 15:30–16:30
+        ort: Turnsaal der Volksschule Gschwandt
+        ansprechperson: ""
+        telefon: ""
+        start: ""
+      - name: Kinderturnen 6–10 Jahre
+        tag: Montag
+        zeit: 16:30–17:30
+        ort: Turnsaal der Volksschule Gschwandt
+        ansprechperson: ""
+        telefon: ""
+        start: ""
+      - name: Fitgymnastik
+        tag: Mittwoch
+        zeit: 18:00–19:00
+        ort: Turnsaal der Volksschule Gschwandt
+        ansprechperson: ""
+        telefon: ""
+        start: "2027-01-13"
+      - name: Wirbelsäulengymnastik
+        tag: Donnerstag
+        zeit: 19:00–20:00
+        ort: Turnsaal der Volksschule Gschwandt
+        ansprechperson: ""
+        telefon: ""
+        start: ""
+    ansprechpersonen:
+      - name: Bitte eintragen
+        funktion: Sektionsleitung
+        telefon: ""
+        email: ""

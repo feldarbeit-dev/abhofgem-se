@@ -1,0 +1,26 @@
+---
+import { getCollection, render } from 'astro:content';
+import Layout from '../../layouts/Layout.astro';
+import Seitenkopf from '../../components/Seitenkopf.astro';
+import { sektion, sektionPfad, iso, datumKurz, type Beitrag } from '../../lib/daten';
+
+export async function getStaticPaths() {
+  return (await getCollection('aktuelles')).map((b) => ({ params: { id: b.id }, props: { b } }));
+}
+const { b } = Astro.props as { b: Beitrag };
+const { Content } = await render(b);
+const s = sektion(b.data.sektion);
+---
+<Layout titel={b.data.titel} beschreibung={b.data.auszug} bild={b.data.bild}>
+  <Seitenkopf titel={b.data.titel} eltern={{ name: 'Alle Beiträge', href: '/aktuelles' }} />
+  <article class="abschnitt">
+    <div class="wrap schmal">
+      <p class="meta">
+        <time datetime={iso(b.data.datum)}>{datumKurz(b.data.datum)}</time>
+        {s && <> · <a href={sektionPfad(s)}>{s.name}</a></>}
+      </p>
+      {b.data.bild && <img class="titelbild" src={b.data.bild} alt={b.data.bild_alt ?? ''} />}
+      <div class="text"><Content /></div>
+    </div>
+  </article>
+</Layout>

@@ -1,0 +1,155 @@
+# Konfiguration für Pages CMS (https://pagescms.org).
+# Achtung: Kommt eine Sektion dazu, den slug auch unten bei "sektion_auswahl" eintragen.
+
+media:
+  input: public/bilder
+  output: /bilder
+  extensions: [jpg, jpeg, png, webp, svg]
+
+components:
+  sektion_auswahl:
+    label: Sektion
+    type: select
+    description: Leer lassen, wenn es den ganzen Verein betrifft.
+    options:
+      values:
+        - { value: fussball, label: Fußball }
+        - { value: nachwuchs, label: Fußball – Nachwuchs }
+        - { value: stockschuetzen, label: Stockschützen }
+        - { value: tennis, label: Tennis }
+        - { value: tischtennis, label: Tischtennis }
+        - { value: turnen, label: Turnen }
+  wochentag:
+    label: Wochentag
+    type: select
+    options:
+      values: [Montag, Dienstag, Mittwoch, Donnerstag, Freitag, Samstag, Sonntag]
+
+content:
+  - name: termine
+    label: Termine
+    type: collection
+    path: src/content/termine
+    filename: "{year}-{month}-{day}-{primary}.md"
+    view:
+      fields: [titel, datum, sektion]
+      primary: titel
+      sort: [datum, titel]
+      default: { sort: datum, order: desc }
+    fields:
+      - { name: titel, label: Titel, type: string, required: true }
+      - { name: datum, label: Datum, type: date, required: true }
+      - { name: uhrzeit, label: Uhrzeit, type: string, description: "Zum Beispiel 18:30" }
+      - { name: ort, label: Ort, type: string }
+      - { name: sektion, component: sektion_auswahl }
+      - { name: bild, label: Bild, type: image }
+      - { name: bild_alt, label: Bildbeschreibung, type: string, description: Kurze Beschreibung des Bildes für Menschen, die es nicht sehen können. }
+      - { name: plaetze, label: Anzahl Plätze, type: number, description: Nur ausfüllen, wenn die Plätze begrenzt sind. }
+      - { name: anmeldelink, label: Anmeldelink (Tally), type: string, description: "Link zum Tally-Formular, zum Beispiel https://tally.so/r/abc123" }
+      - { name: body, label: Text, type: rich-text }
+
+  - name: aktuelles
+    label: Aktuelles
+    type: collection
+    path: src/content/aktuelles
+    filename: "{year}-{month}-{day}-{primary}.md"
+    view:
+      fields: [titel, datum, sektion]
+      primary: titel
+      sort: [datum, titel]
+      default: { sort: datum, order: desc }
+    fields:
+      - { name: titel, label: Titel, type: string, required: true }
+      - { name: datum, label: Datum, type: date, required: true }
+      - { name: sektion, component: sektion_auswahl }
+      - { name: bild, label: Bild, type: image }
+      - { name: bild_alt, label: Bildbeschreibung, type: string, description: Kurze Beschreibung des Bildes für Menschen, die es nicht sehen können. }
+      - { name: auszug, label: Kurzfassung, type: text, description: Ein bis zwei Sätze für die Übersicht. }
+      - { name: body, label: Text, type: rich-text }
+
+  - name: sektionen
+    label: Sektionen
+    type: file
+    path: src/data/sektionen.yml
+    fields:
+      - name: sektionen
+        label: Sektionen
+        type: object
+        list: true
+        fields:
+          - { name: name, label: Name, type: string, required: true }
+          - { name: slug, label: Adresse der Seite (slug), type: string, required: true, description: "Nur Kleinbuchstaben ohne Umlaute, zum Beispiel stockschuetzen. Nachträglich nicht ändern." }
+          - { name: eltern, label: Unterseite von, type: string, description: "Nur für Unterseiten: slug der übergeordneten Sektion, zum Beispiel fussball." }
+          - name: darstellung
+            label: Darstellung der Gruppen
+            type: select
+            options:
+              values:
+                - { value: training, label: Trainingszeiten als Tabelle }
+                - { value: kurse, label: Kurse als Kacheln mit Wochenübersicht }
+          - { name: kurztext, label: Kurztext, type: string, description: Ein Satz für die Kachel auf der Startseite. }
+          - { name: text, label: Text, type: text, description: Leerzeile für einen neuen Absatz. }
+          - name: links
+            label: Links
+            type: object
+            list: true
+            fields:
+              - { name: titel, label: Beschriftung, type: string }
+              - { name: url, label: Adresse (URL), type: string }
+          - name: gruppen
+            label: Trainingszeiten und Kurse
+            type: object
+            list: true
+            fields:
+              - { name: name, label: Gruppe oder Kurs, type: string, required: true }
+              - { name: tag, component: wochentag }
+              - { name: zeit, label: Zeit, type: string, description: "Zum Beispiel 17:00–18:30" }
+              - { name: ort, label: Ort, type: string }
+              - { name: ansprechperson, label: Ansprechperson, type: string }
+              - { name: telefon, label: Telefon, type: string }
+              - { name: start, label: Saison- oder Kursstart, type: date, description: Wird nur angezeigt, solange das Datum in der Zukunft liegt. }
+          - name: ansprechpersonen
+            label: Ansprechpersonen
+            type: object
+            list: true
+            fields:
+              - { name: name, label: Name, type: string, required: true }
+              - { name: funktion, label: Funktion, type: string }
+              - { name: telefon, label: Telefon, type: string }
+              - { name: email, label: E-Mail, type: string }
+
+  - name: verein
+    label: Verein
+    type: file
+    path: src/data/verein.yml
+    fields:
+      - { name: name, label: Vereinsname, type: string, required: true }
+      - { name: kurzname, label: Kurzname, type: string, required: true }
+      - { name: slogan, label: Leitsatz auf der Startseite, type: string }
+      - name: adresse
+        label: Adresse
+        type: object
+        fields:
+          - { name: strasse, label: Straße und Hausnummer, type: string }
+          - { name: plz, label: Postleitzahl, type: string }
+          - { name: ort, label: Ort, type: string }
+      - { name: zvr, label: ZVR-Zahl, type: string }
+      - { name: email, label: E-Mail, type: string }
+      - { name: obmann, label: Obmann, type: string }
+      - { name: kartenlink, label: Kartenlink, type: string, description: Leer lassen – dann wird automatisch ein Link zur Vereinsadresse erzeugt. }
+      - { name: facebook, label: Facebook, type: string }
+      - { name: instagram, label: Instagram, type: string }
+      - name: tally
+        label: Tally-Formulare
+        type: object
+        fields:
+          - { name: beitritt, label: Beitrittsformular, type: string, description: "Zum Beispiel https://tally.so/r/abc123" }
+          - { name: kontakt, label: Kontaktformular, type: string }
+      - name: tarife
+        label: Mitgliedstarife
+        type: object
+        list: true
+        fields:
+          - { name: name, label: Tarif, type: string, required: true }
+          - { name: preis, label: Beitrag, type: string, description: "Zum Beispiel € 60" }
+          - { name: hinweis, label: Hinweis, type: string, description: "Zum Beispiel pro Jahr" }

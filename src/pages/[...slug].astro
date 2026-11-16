@@ -1,0 +1,135 @@
+---
+// Eine Vorlage für alle Sektionsseiten (/fussball, /fussball/nachwuchs, /turnen …).
+import Layout from '../layouts/Layout.astro';
+import Seitenkopf from '../components/Seitenkopf.astro';
+import TerminListe from '../components/TerminListe.astro';
+import BeitragListe from '../components/BeitragListe.astro';
+import Personen from '../components/Personen.astro';
+import {
+  sektionen, sektion, untersektionen, sektionPfad, mitUnterseiten, kommendeTermine, beitraege,
+  absaetze, istZukunft, datumKurz, telLink, WOCHENTAGE, type Sektion, type Gruppe,
+} from '../lib/daten';
+
+export function getStaticPaths() {
+  return sektionen.map((s) => ({ params: { slug: sektionPfad(s).slice(1) }, props: { s } }));
+}
+const { s } = Astro.props as { s: Sektion };
+const eltern = sektion(s.eltern);
+const unterseiten = untersektionen(s.slug);
+const gruppen = (s.gruppen ?? []).filter((g) => g?.name);
+const personen = (s.ansprechpersonen ?? []).filter((p) => p?.name);
+const links = (s.links ?? []).filter((l) => l?.url);
+const kurse = s.darstellung === 'kurse';
+const slugs = mitUnterseiten(s.slug);
+const termine = await kommendeTermine(slugs);
+const neues = (await beitraege(slugs)).slice(0, 6);
+
+const start = (g: Gruppe) => (istZukunft(g.start) ? g.start : undefined);
+const proTag = WOCHENTAGE.map((tag) => ({
+  tag,
+  gruppen: gruppen.filter((g) => g.tag === tag).sort((a, b) => (a.zeit ?? '').localeCompare(b.zeit ?? '')),
+}));
+// Samstag und Sonntag nur zeigen, wenn dort etwas stattfindet.
+const woche = proTag.filter((t, i) => i < 5 || t.gruppen.length);
+---
+<Layout titel={eltern ? `${s.name} – ${eltern.name}` : s.name} beschreibung={s.kurztext}>
+  <Seitenkopf titel={s.name} text={s.kurztext} eltern={eltern && { name: eltern.name, href: sektionPfad(eltern) }} />
+
+  <section class="abschnitt">
+    <div class="wrap schmal text">
+      {absaetze(s.text).map((a) => <p>{a}</p>)}
+      {(links.length > 0 || unterseiten.length > 0) && (
+        <ul class="linkliste">
+          {unterseiten.map((u) => <li><a class="knopf" href={sektionPfad(u)}>{u.name}</a></li>)}
+          {links.map((l) => <li><a class="knopf zweit" href={l.url} rel="noopener">{l.titel || l.url}</a></li>)}
+        </ul>
+      )}
+    </div>
+  </section>
+
+  {gruppen.length > 0 && kurse && (
+    <section class="abschnitt grau" aria-labelledby="t-kurse">
+      <div class="wrap">
+        <div class="abschnitt-kopf"><h2 id="t-kurse">Kurse</h2></div>
+        <ul class="raster">
+          {gruppen.map((g) => (
+            <li class="karte">
+              {start(g) && <span class="marke start" data-bis={start(g)}>Start am {datumKurz(start(g)!)}</span>}
+              <h3>{g.name}</h3>
+              <dl class="daten">
+                {(g.tag || g.zeit) && <div><dt>Wann</dt><dd>{[g.tag, g.zeit].filter(Boolean).join(', ')}</dd></div>}
+                {g.ort && <div><dt>Wo</dt><dd>{g.ort}</dd></div>}
+                {g.ansprechperson && <div><dt>Leitung</dt><dd>{g.ansprechperson}</dd></div>}
+                {g.telefon && <div><dt>Telefon</dt><dd><a href={telLink(g.telefon)}>{g.telefon}</a></dd></div>}
+              </dl>
+            </li>
+          ))}
+        </ul>
+
+        <h2 style="margin-top:2.5rem">Wochenübersicht</h2>
+        <ul class="woche" style={`--tage:${woche.length}`}>
+          {woche.map((t) => (
+            <li class:list={{ ohne: t.gruppen.length === 0 }}>
+              <h3>{t.tag}</h3>
+              {t.gruppen.length === 0 ? <p class="frei">–</p> : (
+                <ul>{t.gruppen.map((g) => <li><b>{g.zeit}</b>{g.name}</li>)}</ul>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  )}
+
+  {gruppen.length > 0 && !kurse && (
+    <section class="abschnitt grau" aria-labelledby="t-training">
+      <div class="wrap">
+        <div class="abschnitt-kopf"><h2 id="t-training">Trainingszeiten</h2></div>
+        <div class="tabelle-rahmen" style="background:var(--weiss)">
+          <table class="stapel">
+            <thead><tr><th scope="col">Gruppe</th><th scope="col">Tag</th><th scope="col">Zeit</th><th scope="col">Ort</th><th scope="col">Ansprechperson</th></tr></thead>
+            <tbody>
+              {gruppen.map((g) => (
+                <tr>
+                  <th scope="row">
+                    {g.name}
+                    {start(g) && <><br /><span class="start" data-bis={start(g)}>Saisonstart {datumKurz(start(g)!)}</span></>}
+                  </th>
+                  <td data-titel="Tag">{g.tag}</td>
+                  <td data-titel="Zeit">{g.zeit}</td>
+                  <td data-titel="Ort">{g.ort}</td>
+                  <td data-titel="Ansprechperson">{g.ansprechperson}{g.telefon && <>{g.ansprechperson && ', '}<a href={telLink(g.telefon)}>{g.telefon}</a></>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  )}
+
+  <section class="abschnitt" aria-labelledby="t-termine">
+    <div class="wrap">
+      <div class="abschnitt-kopf"><h2 id="t-termine">Termine</h2><a class="mehr" href="/termine">Alle Termine →</a></div>
+      <TerminListe termine={termine} leer={`Derzeit sind keine Termine der Sektion ${s.name} eingetragen.`} />
+    </div>
+  </section>
+
+  {neues.length > 0 && (
+    <section class="abschnitt grau" aria-labelledby="t-aktuelles">
+      <div class="wrap">
+        <div class="abschnitt-kopf"><h2 id="t-aktuelles">Aktuelles</h2><a class="mehr" href="/aktuelles">Alle Beiträge →</a></div>
+        <BeitragListe beitraege={neues} />
+      </div>
+    </section>
+  )}
+
+  {personen.length > 0 && (
+    <section class="abschnitt" aria-labelledby="t-personen">
+      <div class="wrap">
+        <div class="abschnitt-kopf"><h2 id="t-personen">Ansprechpersonen</h2></div>
+        <Personen personen={personen} />
+      </div>
+    </section>
+  )}
+</Layout>

@@ -1,0 +1,46 @@
+---
+import { getCollection, render } from 'astro:content';
+import Layout from '../../layouts/Layout.astro';
+import Seitenkopf from '../../components/Seitenkopf.astro';
+import Tally from '../../components/Tally.astro';
+import { verein, sektion, sektionPfad, iso, datumLang, heute, type Termin } from '../../lib/daten';
+
+export async function getStaticPaths() {
+  return (await getCollection('termine')).map((t) => ({ params: { id: t.id }, props: { t } }));
+}
+const { t } = Astro.props as { t: Termin };
+const { Content } = await render(t);
+const d = t.data;
+const s = sektion(d.sektion);
+const tag = iso(d.datum);
+const vorbei = tag < heute();
+const betreff = encodeURIComponent(`Anmeldung: ${d.titel} am ${datumLang(d.datum)}`);
+---
+<Layout titel={d.titel} beschreibung={`${datumLang(d.datum)}${d.ort ? `, ${d.ort}` : ''}`} bild={d.bild}>
+  <Seitenkopf titel={d.titel} eltern={{ name: 'Alle Termine', href: '/termine' }} />
+  <article class="abschnitt">
+    <div class="wrap schmal">
+      <p class="plaetze" data-vorbei={tag} hidden={!vorbei}>Dieser Termin hat bereits stattgefunden.</p>
+      <dl class="fakten">
+        <div><dt>Datum</dt><dd><time datetime={tag}>{datumLang(d.datum)}</time></dd></div>
+        {d.uhrzeit && <div><dt>Uhrzeit</dt><dd>{d.uhrzeit} Uhr</dd></div>}
+        {d.ort && <div><dt>Ort</dt><dd>{d.ort}</dd></div>}
+        {s && <div><dt>Sektion</dt><dd><a href={sektionPfad(s)}>{s.name}</a></dd></div>}
+      </dl>
+      {d.bild && <img class="titelbild" src={d.bild} alt={d.bild_alt ?? ''} />}
+      <div class="text"><Content /></div>
+
+      {!vorbei && (
+        <section class="box" data-bis={tag} aria-labelledby="t-anmeldung">
+          <h2 id="t-anmeldung">Anmeldung</h2>
+          {d.plaetze && <p class="plaetze">Begrenzt auf <strong>{d.plaetze} Plätze</strong>. Die Plätze werden in der Reihenfolge der Anmeldungen vergeben.</p>}
+          {d.anmeldelink ? (
+            <Tally link={d.anmeldelink} titel={`Anmeldeformular: ${d.titel}`} />
+          ) : (
+            <p>Für diesen Termin gibt es kein Anmeldeformular. Bei Fragen oder zur Anmeldung schreib uns: <a href={`mailto:${verein.email}?subject=${betreff}`}>{verein.email}</a></p>
+          )}
+        </section>
+      )}
+    </div>
+  </article>
+</Layout>

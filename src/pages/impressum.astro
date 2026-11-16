@@ -1,0 +1,28 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Seitenkopf from '../components/Seitenkopf.astro';
+import { verein } from '../lib/daten';
+---
+<Layout titel="Impressum">
+  <Seitenkopf titel="Impressum" text="Offenlegung gemäß § 25 Mediengesetz und Angaben gemäß § 5 E-Commerce-Gesetz." />
+  <section class="abschnitt">
+    <div class="wrap schmal text">
+      <h2>Medieninhaber und Herausgeber</h2>
+      <address>
+        <p>{verein.name}<br />{verein.adresse.strasse}<br />{verein.adresse.plz} {verein.adresse.ort}<br />Österreich</p>
+        <p>E-Mail: <a href={`mailto:${verein.email}`}>{verein.email}</a></p>
+      </address>
+      <p>ZVR-Zahl: {verein.zvr}<br />Rechtsform: Verein nach dem Vereinsgesetz 2002</p>
+      {verein.obmann && <p>Vertreten durch: {verein.obmann} (Obmann)</p>}
+
+      <h2>Vereinszweck und Blattlinie</h2>
+      <p>Der Verein ist gemeinnützig und bezweckt die Förderung des Sports in Gschwandt. Diese Website informiert über den Verein, seine Sektionen, Trainingszeiten und Veranstaltungen.</p>
+
+      <h2>Haftung für Inhalte und Links</h2>
+      <p>Die Inhalte dieser Website werden sorgfältig erstellt. Für Richtigkeit, Vollständigkeit und Aktualität wird dennoch keine Gewähr übernommen. Für Inhalte verlinkter externer Seiten sind ausschließlich deren Betreiber verantwortlich.</p>
+
+      <h2>Urheberrecht</h2>
+      <p>Texte und Bilder dieser Website sind urheberrechtlich geschützt. Eine Verwendung ist nur mit Zustimmung des Vereins erlaubt.</p>
+    </div>
+  </section>
+</Layout>

@@ -1,0 +1,66 @@
+---
+import Layout from '../layouts/Layout.astro';
+import TerminListe from '../components/TerminListe.astro';
+import BeitragListe from '../components/BeitragListe.astro';
+import { verein, hauptsektionen, sektionPfad, kommendeTermine, beitraege } from '../lib/daten';
+
+// Ein paar Termine mehr als nötig: fällt einer weg, rückt ohne Neubau der nächste nach.
+const termine = (await kommendeTermine()).slice(0, 6);
+const neues = (await beitraege()).slice(0, 3);
+---
+<Layout>
+  <section class="dunkel hero">
+    <div class="wrap">
+      <p class="ueber">{verein.adresse.ort}</p>
+      <h1>{verein.name}</h1>
+      <p>{verein.slogan}</p>
+      <div class="knoepfe">
+        <a class="knopf" href="/mitglied-werden">Mitglied werden</a>
+        <a class="knopf zweit" href="#sektionen">Sektionen ansehen</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="abschnitt" id="sektionen" aria-labelledby="t-sektionen">
+    <div class="wrap">
+      <div class="abschnitt-kopf"><h2 id="t-sektionen">Unsere Sektionen</h2></div>
+      <ul class="raster">
+        {hauptsektionen.map((s) => (
+          <li class="karte sektion-kachel">
+            <h3><a href={sektionPfad(s)}>{s.name}</a></h3>
+            <p>{s.kurztext}</p>
+            <span class="pfeil" aria-hidden="true">Zur Sektion →</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <section class="abschnitt grau" aria-labelledby="t-termine">
+    <div class="wrap">
+      <div class="abschnitt-kopf">
+        <h2 id="t-termine">Nächste Termine</h2>
+        <a class="mehr" href="/termine">Alle Termine →</a>
+      </div>
+      <TerminListe termine={termine} nur3 />
+    </div>
+  </section>
+
+  <section class="abschnitt" aria-labelledby="t-aktuelles">
+    <div class="wrap">
+      <div class="abschnitt-kopf">
+        <h2 id="t-aktuelles">Aktuelles</h2>
+        <a class="mehr" href="/aktuelles">Alle Beiträge →</a>
+      </div>
+      <BeitragListe beitraege={neues} />
+    </div>
+  </section>
+
+  <section class="dunkel abschnitt banner" aria-labelledby="t-mitglied">
+    <div class="wrap">
+      <h2 id="t-mitglied">Werde Teil der {verein.kurzname}</h2>
+      <p>Mit deiner Mitgliedschaft kannst du in allen Sektionen mitmachen und unterstützt den Sport in Gschwandt.</p>
+      <div class="knoepfe"><a class="knopf" href="/mitglied-werden">Mitglied werden</a></div>
+    </div>
+  </section>
+</Layout>

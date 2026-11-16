@@ -1,0 +1,37 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Seitenkopf from '../components/Seitenkopf.astro';
+import Tally from '../components/Tally.astro';
+import { verein } from '../lib/daten';
+const tarife = (verein.tarife ?? []).filter((t) => t?.name);
+---
+<Layout titel="Mitglied werden" beschreibung={`Mitglied der ${verein.name} werden: Tarife und Beitrittsformular.`}>
+  <Seitenkopf titel="Mitglied werden" text="Eine Mitgliedschaft gilt für den ganzen Verein – du kannst in allen Sektionen mitmachen." />
+  <section class="abschnitt">
+    <div class="wrap schmal">
+      {tarife.length > 0 && (
+        <>
+          <h2>Mitgliedsbeiträge</h2>
+          <div class="tabelle-rahmen">
+            <table>
+              <thead><tr><th scope="col">Tarif</th><th scope="col">Beitrag</th></tr></thead>
+              <tbody>
+                {tarife.map((t) => (
+                  <tr><th scope="row">{t.name}</th><td>{t.preis}{t.hinweis && <span class="meta"> ({t.hinweis})</span>}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+      <section class="box" aria-labelledby="t-beitritt">
+        <h2 id="t-beitritt">Beitritt</h2>
+        {verein.tally?.beitritt ? (
+          <Tally link={verein.tally.beitritt} titel="Beitrittsformular" />
+        ) : (
+          <p>Schreib uns eine E-Mail mit Name, Adresse, Geburtsdatum und der gewünschten Sektion: <a href={`mailto:${verein.email}?subject=${encodeURIComponent('Mitglied werden')}`}>{verein.email}</a></p>
+        )}
+      </section>
+    </div>
+  </section>
+</Layout>

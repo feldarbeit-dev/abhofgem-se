@@ -1,0 +1,11 @@
+---
+interface Props { titel: string; text?: string; eltern?: { name: string; href: string } }
+const { titel, text, eltern } = Astro.props;
+---
+<div class="dunkel seitenkopf">
+  <div class="wrap">
+    {eltern && <p class="brotkrumen"><a href={eltern.href}>← {eltern.name}</a></p>}
+    <h1>{titel}</h1>
+    {text && <p>{text}</p>}
+  </div>
+</div>

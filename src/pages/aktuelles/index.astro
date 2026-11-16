@@ -1,0 +1,11 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Seitenkopf from '../../components/Seitenkopf.astro';
+import BeitragListe from '../../components/BeitragListe.astro';
+import { beitraege } from '../../lib/daten';
+const alle = await beitraege();
+---
+<Layout titel="Aktuelles" beschreibung="Neuigkeiten und Berichte aus den Sektionen der Sportunion Gschwandt.">
+  <Seitenkopf titel="Aktuelles" text="Neuigkeiten und Berichte aus dem Verein und den Sektionen." />
+  <section class="abschnitt"><div class="wrap"><BeitragListe beitraege={alle} /></div></section>
+</Layout>
