@@ -75,7 +75,17 @@
     .tile .price { font-size: 12px; color: #555; }
     .tile .sum { font-size: 13px; font-weight: 800; color: var(--green); }
     .tile .bottom span { white-space: nowrap; }
-    @media (max-width: 400px) { .tile.has .price { display: none; } .tile.has .bottom { justify-content: flex-end; } }
+    .tile .bottom { align-items: center; }
+    .tile.has .price { display: none; }
+    /* Minus-Knopf erscheint nur, wenn schon etwas in der Kiste ist */
+    .tile .minus {
+      display: none; align-items: center; justify-content: center; flex: 0 0 auto;
+      width: 38px; height: 32px; min-height: 0; padding: 0; border-radius: 8px;
+      background: #fff; color: var(--red); border: 2px solid var(--red); font-size: 22px; font-weight: 800; line-height: 1;
+    }
+    .tile .minus:active { background: #fbe3e0; }
+    .tile.has .minus { display: flex; }
+    body.edit .tile .minus { display: none; }
     .badge {
       position: absolute; top: -8px; right: -6px; min-width: 28px; height: 28px; border-radius: 14px; padding: 0 7px;
       background: var(--green); color: #fff; font-weight: 800; font-size: 14px; display: none;
@@ -113,11 +123,36 @@
 
     /* Hinweis als kleines Toast über der Leiste – spart eine ganze Zeile Platz */
     #copyNotice {
-      position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%);
+      /* oben einblenden, damit nie Knöpfe der Leiste oder Listen verdeckt werden */
+      position: fixed; left: 50%; top: calc(10px + env(safe-area-inset-top, 0px)); transform: translateX(-50%);
+      box-shadow: 0 3px 12px rgba(0,0,0,.25);
       max-width: calc(100% - 24px); background: #333; color: #fff; font-size: 13px; text-align: center;
       padding: 7px 12px; border-radius: 18px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 30;
     }
     #copyNotice.show { opacity: .95; }
+    #copyNotice.has-action { pointer-events: auto; display: flex; align-items: center; gap: 10px; white-space: nowrap; padding: 4px 4px 4px 14px; }
+    #copyNotice button { background: #fff; color: #222; font-weight: 700; font-size: 14px; min-height: 36px; padding: 0 12px; border-radius: 14px; }
+    .footer-total .saved-tag { font-size: 12px; font-weight: 700; margin-left: 4px; padding: 1px 7px; border-radius: 10px; vertical-align: middle; }
+    .saved-tag.ok { background: var(--green-soft); color: var(--green-dark); }
+    .saved-tag.changed { background: var(--yellow); color: #7a5d00; }
+
+    /* Liste der heutigen Kisten */
+    .day-box { display: none; position: absolute; left: 8px; right: 8px; bottom: calc(100% + 8px);
+      background: #fff; border: 2px solid var(--green); border-radius: 12px; padding: 10px 12px; box-shadow: 0 4px 18px rgba(0,0,0,0.18);
+      max-height: calc(100vh - 150px); max-height: calc(100dvh - 150px); overflow-y: auto; overscroll-behavior: contain; z-index: 15; }
+    .day-box h3 { margin: 0 0 4px; color: var(--green); font-size: 17px; }
+    .day-box .day-sum { font-size: 14px; color: #444; margin-bottom: 6px; }
+    .day-box ul { list-style: none; margin: 0; padding: 0; }
+    .day-box li { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+    .day-box li.current { background: var(--green-soft); border-radius: 8px; padding-left: 6px; }
+    .day-box .who { flex: 1; min-width: 0; font-size: 15px; }
+    .day-box .who small { display: block; color: #777; font-size: 12px; }
+    .day-box .who b { overflow-wrap: anywhere; }
+    .day-box .amt { font-weight: 800; white-space: nowrap; font-size: 15px; }
+    .day-box li button { font-size: 13px; padding: 0 10px; min-height: 40px; }
+    .day-box .day-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .day-box .day-actions button { flex: 1; min-height: var(--tap); }
+    .day-box .empty-day { color: #777; font-size: 14px; padding: 8px 0; }
 
     .check-box, .manual-copy-box {
       display: none; position: absolute; left: 8px; right: 8px; bottom: calc(100% + 8px);
@@ -160,7 +195,7 @@
              autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" />
       <button class="btn-neutral" id="editBtn" type="button">Angebot</button>
     </div>
-    <div class="hint">Tippen +1 · Lang drücken −1 · Gramm ins Feld</div>
+    <div class="hint">Tippen +1 · „−“ zieht ab · Gramm ins Feld</div>
     <div class="edit-banner">
       Angebot bearbeiten: Kachel antippen = ein-/ausblenden. Danach „Fertig“ drücken.
       <div class="row">
@@ -198,13 +233,23 @@
       <div class="check-close">Antippen zum Schließen</div>
     </div>
 
+    <div class="day-box" id="dayBox">
+      <h3>Kisten heute</h3>
+      <div class="day-sum" id="daySum"></div>
+      <ul id="dayList"></ul>
+      <div class="day-actions">
+        <button id="copyDailyBtn" type="button">Abschluss kopieren</button>
+        <button class="btn-neutral" id="closeDayBtn" type="button">Schließen</button>
+      </div>
+    </div>
+
     <div class="footer-total">
-      <div class="figures"><span id="itemCount">0</span> Artikel – Gesamt: <span id="total">0,00</span> €</div>
+      <div class="figures"><span id="itemCount">0</span> Artikel – Gesamt: <span id="total">0,00</span> €<span class="saved-tag" id="savedTag"></span></div>
       <div class="actions">
         <button class="btn-neutral" id="checkBtn" type="button" title="Inhalt der aktuellen Kiste anzeigen">Check</button>
         <button id="waBtn" type="button" title="WhatsApp mit Rechnungstext öffnen">WA</button>
         <button id="saveSaleBtn" type="button" title="Kiste im Tagesabschluss speichern">Speichern</button>
-        <button id="dailyCloseBtn" type="button" title="Tagesabschluss kopieren">Abschluss</button>
+        <button id="dailyCloseBtn" type="button" title="Kisten von heute & Tagesabschluss">Abschluss</button>
         <button class="btn-danger" id="resetBtn" type="button" title="Alle Mengen löschen">Löschen</button>
       </div>
     </div>
@@ -294,6 +339,7 @@
     var state = {};          // key -> Anzahl (Stück) bzw. Gramm gesamt (Gewicht)
     var editMode = false;
     var lastSavedSignature = '';
+    var currentSaleId = null;  // ID der aktuellen Kiste im Tagesabschluss (verhindert doppelte Einträge)
 
     var $ = function(id){ return document.getElementById(id); };
     var customerInput = $('customerName'), searchInput = $('search'), checkBox = $('checkBox');
@@ -323,12 +369,21 @@
     function safeSetStorage(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
     function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
 
-    function showNotice(msg) {
+    // Hinweis-Einblendung, optional mit Knopf (z. B. „Rückgängig“)
+    function showNotice(msg, actionLabel, actionFn) {
       copyNotice.textContent = msg;
+      copyNotice.classList.toggle('has-action', !!actionLabel);
+      if (actionLabel) {
+        var b = document.createElement('button');
+        b.type = 'button'; b.textContent = actionLabel;
+        b.addEventListener('click', function(){ hideNotice(); actionFn(); });
+        copyNotice.appendChild(b);
+      }
       copyNotice.classList.add('show');
       clearTimeout(showNotice.t);
-      showNotice.t = setTimeout(function(){ copyNotice.classList.remove('show'); }, 2500);
+      showNotice.t = setTimeout(hideNotice, actionLabel ? 6000 : 2500);
     }
+    function hideNotice() { copyNotice.classList.remove('show', 'has-action'); }
     function getCustomerName() { return customerInput.value.replace(/\s+/g, ' ').trim(); }
 
     // ---------- Angebot ----------
@@ -358,7 +413,8 @@
         var grid = $(c.grid); grid.innerHTML = '';
         var list = c.list.slice().sort(function(a,b){ return a.name.localeCompare(b.name); }).filter(function(p){
           if (term && p.name.toLowerCase().indexOf(term) === -1) return false;
-          if (!editMode && !term && !p.active) return false;
+          // Ausgeblendete Produkte trotzdem zeigen, wenn sie in der aktuellen Kiste sind
+          if (!editMode && !term && !p.active && !(state[productKey(c.type, p.name)] > 0)) return false;
           return true;
         });
         if (!list.length) {
@@ -380,7 +436,7 @@
         '<div class="badge"></div>' +
         '<div><div class="name"></div><div class="unit">' + unitTxt + '</div></div>' +
         (isWeight(p) ? '<div class="gram-wrap"><input type="number" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" min="0" step="10" placeholder="0" aria-label="Gramm" /><span>g</span></div>' : '') +
-        '<div class="bottom"><span class="price">' + priceTxt + '</span><span class="sum"></span></div>';
+        '<div class="bottom"><button type="button" class="minus" aria-label="Eins weniger">−</button><span class="price">' + priceTxt + '</span><span class="sum"></span></div>';
       t.querySelector('.name').textContent = hyphenate(p.name);
 
       var input = t.querySelector('input');
@@ -397,7 +453,12 @@
           input.addEventListener(ev, function(e){ e.stopPropagation(); });
         });
       }
-      bindPress(t, function(){ tap(t, p, k); }, function(){ longPress(t, p, k); });
+      var minus = t.querySelector('.minus');
+      ['pointerdown', 'pointerup'].forEach(function(ev){
+        minus.addEventListener(ev, function(e){ e.stopPropagation(); });
+      });
+      minus.addEventListener('click', function(e){ e.stopPropagation(); minusOne(t, p, k); });
+      bindPress(t, function(){ tap(t, p, k); }, function(){ minusOne(t, p, k); });
       t.addEventListener('contextmenu', function(e){ e.preventDefault(); });
       paint(t, p, k, false);
       return t;
@@ -447,7 +508,7 @@
       buzz(15); paint(t, p, k, false); updateTotal();
     }
 
-    function longPress(t, p, k) {
+    function minusOne(t, p, k) {
       if (editMode) return;
       var v = state[k] || 0;
       if (v <= 0) return;
@@ -477,6 +538,10 @@
       s.items.forEach(function(i){ n += i.qty; });
       $('total').textContent = formatEuro(s.total);
       $('itemCount').textContent = n;
+      var tag = $('savedTag');
+      if (!currentSaleId) { tag.textContent = ''; tag.className = 'saved-tag'; }
+      else if (saleSignature(s) === lastSavedSignature) { tag.textContent = '✓ gespeichert'; tag.className = 'saved-tag ok'; }
+      else { tag.textContent = '• geändert'; tag.className = 'saved-tag changed'; }
       renderCheck();
     }
 
@@ -528,28 +593,126 @@
     function saleSignature(sale) {
       return getCustomerName() + '##' + sale.items.map(function(it){ return it.name + '|' + it.qty + '|' + it.price; }).join('||') + '::' + formatEuro(sale.total);
     }
-    function addSaleToDailyClose(sale) {
-      var data = loadSales(), day = todayKey();
-      if (!data[day]) data[day] = [];
-      data[day].push({ time: new Date().toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' }), customer: getCustomerName(), items: sale.items, total: sale.total });
-      saveSales(data);
+    function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+    function nowTime() { return new Date().toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' }); }
+
+    // Kisten von heute laden; ältere Einträge ohne ID bekommen einmalig eine
+    function loadToday() {
+      var data = loadSales(), day = todayKey(), list = data[day] || [], changed = false;
+      list.forEach(function(s){ if (!s.id) { s.id = newId(); changed = true; } });
+      data[day] = list;
+      if (changed) saveSales(data);
+      return { data: data, day: day, list: list };
+    }
+
+    // Speichert die aktuelle Kiste. Ist sie schon gespeichert (z. B. durch WA), wird der Eintrag
+    // überschrieben statt neu angelegt → keine doppelten Kisten/Umsätze mehr.
+    function upsertCurrentSale(sale) {
+      var t = loadToday(), idx = -1;
+      if (currentSaleId) t.list.forEach(function(s, i){ if (s.id === currentSaleId) idx = i; });
+      var entry = { id: currentSaleId || newId(), time: nowTime(), customer: getCustomerName(), items: sale.items, total: sale.total };
+      if (idx >= 0) { entry.time = t.list[idx].time; entry.changed = nowTime(); t.list[idx] = entry; }
+      else t.list.push(entry);
+      saveSales(t.data);
+      currentSaleId = entry.id;
+      lastSavedSignature = saleSignature(sale);
+      return idx >= 0 ? 'updated' : 'new';
     }
     function autoSaveCurrentSale() {
       var sale = getCurrentSaleItems();
       if (!sale.items.length) return false;
-      var sig = saleSignature(sale);
-      if (sig === lastSavedSignature) return false;
-      addSaleToDailyClose(sale); lastSavedSignature = sig;
-      return true;
+      if (currentSaleId && saleSignature(sale) === lastSavedSignature) return false;
+      var r = upsertCurrentSale(sale);
+      updateTotal();
+      return r;
     }
     function saveCurrentSale() {
       var sale = getCurrentSaleItems();
       if (!sale.items.length) { showNotice('Nichts ausgewählt'); return; }
-      var who = getCustomerName();
-      if (saleSignature(sale) !== lastSavedSignature) addSaleToDailyClose(sale);
+      var who = getCustomerName(), r = 'same';
+      if (!currentSaleId || saleSignature(sale) !== lastSavedSignature) r = upsertCurrentSale(sale);
       resetCurrentOrder();
-      showNotice((who ? 'Kiste ' + who : 'Kiste') + ' gespeichert – nächste Kiste');
+      showNotice((who ? 'Kiste ' + who : 'Kiste') + (r === 'updated' ? ' aktualisiert' : ' gespeichert') + ' – nächste Kiste');
       $('scrollArea').scrollTop = 0;
+    }
+
+    // ---------- Liste „Kisten heute“ ----------
+    var dayBox = $('dayBox');
+    function findProduct(name) {
+      var hit = null;
+      CATEGORIES.forEach(function(c){ c.list.forEach(function(p){ if (!hit && p.name === name) hit = { c: c, p: p }; }); });
+      return hit;
+    }
+    function renderDayBox() {
+      if (dayBox.style.display !== 'block') return;
+      var list = loadToday().list, sum = 0, ul = $('dayList');
+      ul.innerHTML = '';
+      list.forEach(function(s){ sum += s.total || 0; });
+      $('daySum').textContent = list.length + (list.length === 1 ? ' Kiste' : ' Kisten') + ' · Umsatz ' + formatEuro(sum) + ' €';
+      if (!list.length) { ul.innerHTML = '<li class="empty-day">Heute noch keine Kiste gespeichert.</li>'; return; }
+      list.forEach(function(s, i){
+        var li = document.createElement('li');
+        if (s.id === currentSaleId) li.className = 'current';
+        var who = document.createElement('div'); who.className = 'who';
+        var b = document.createElement('b'); b.textContent = s.customer || ('Kiste ' + (i + 1));
+        var sm = document.createElement('small'); sm.textContent = s.time + (s.changed ? ' · geändert ' + s.changed : '') + (s.id === currentSaleId ? ' · gerade offen' : '');
+        who.appendChild(b); who.appendChild(sm);
+        var amt = document.createElement('span'); amt.className = 'amt'; amt.textContent = formatEuro(s.total || 0) + ' €';
+        var open = document.createElement('button'); open.type = 'button'; open.className = 'btn-neutral'; open.textContent = 'Öffnen';
+        open.addEventListener('click', function(){ openSavedSale(s.id); });
+        var del = document.createElement('button'); del.type = 'button'; del.className = 'btn-danger'; del.textContent = '✕';
+        del.setAttribute('aria-label', 'Kiste löschen');
+        del.addEventListener('click', function(){
+          // Zweistufig: erst „Löschen?“, dann wirklich löschen (confirm() ist in Wix oft blockiert)
+          if (!del._armed) {
+            del._armed = true; del.textContent = 'Löschen?';
+            setTimeout(function(){ del._armed = false; del.textContent = '✕'; }, 3000);
+            return;
+          }
+          deleteSavedSale(s.id);
+        });
+        li.appendChild(who); li.appendChild(amt); li.appendChild(open); li.appendChild(del);
+        ul.appendChild(li);
+      });
+    }
+    function deleteSavedSale(id) {
+      var t = loadToday(), removed = null, pos = -1;
+      t.list.forEach(function(s, i){ if (s.id === id) { removed = s; pos = i; } });
+      if (!removed) return;
+      t.list.splice(pos, 1); saveSales(t.data);
+      var wasCurrent = id === currentSaleId;
+      if (wasCurrent) { currentSaleId = null; lastSavedSignature = ''; updateTotal(); }
+      renderDayBox();
+      showNotice('Kiste ' + (removed.customer || '') + ' gelöscht', 'Rückgängig', function(){
+        var t2 = loadToday();
+        t2.list.splice(Math.min(pos, t2.list.length), 0, removed); saveSales(t2.data);
+        if (wasCurrent) { currentSaleId = removed.id; lastSavedSignature = ''; updateTotal(); }
+        renderDayBox();
+      });
+    }
+    function openSavedSale(id) {
+      var entry = null;
+      loadToday().list.forEach(function(s){ if (s.id === id) entry = s; });
+      if (!entry) return;
+      if (id !== currentSaleId && getCurrentSaleItems().items.length) {
+        showNotice('Aktuelle Kiste zuerst speichern oder löschen');
+        return;
+      }
+      state = {}; var missing = 0;
+      (entry.items || []).forEach(function(it){
+        var hit = findProduct(it.name);
+        if (!hit) { missing++; return; }
+        state[productKey(hit.c.type, hit.p.name)] = it.weight ? (it.grams || 0) * (it.qty || 1) : (it.qty || 0);
+      });
+      customerInput.value = entry.customer || '';
+      searchInput.value = '';
+      currentSaleId = entry.id;
+      dayBox.style.display = 'none';
+      renderAll();
+      lastSavedSignature = saleSignature(getCurrentSaleItems());
+      updateTotal();
+      $('scrollArea').scrollTop = 0;
+      showNotice(missing ? missing + ' Produkt(e) nicht mehr in der Liste' : 'Kiste geöffnet – Änderungen mit „Speichern“ übernehmen');
     }
 
     function buildDailyCloseText() {
@@ -620,17 +783,21 @@
     }
 
     function resetCurrentOrder() {
-      state = {}; lastSavedSignature = '';
+      state = {}; lastSavedSignature = ''; currentSaleId = null;
       customerInput.value = '';
+      closePanels();
+      renderAll();
+    }
+    function closePanels() {
       checkBox.style.display = 'none';
       manualCopyBox.style.display = 'none';
-      renderAll();
+      dayBox.style.display = 'none';
     }
 
     // ---------- Buttons ----------
     searchInput.addEventListener('input', renderAll);
     searchInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); searchInput.blur(); } });
-    customerInput.addEventListener('input', renderCheck);
+    customerInput.addEventListener('input', updateTotal);
     customerInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); customerInput.blur(); } });
     $('editBtn').addEventListener('click', function(){
       editMode = !editMode;
@@ -641,8 +808,9 @@
     $('showAllBtn').addEventListener('click', function(){ setAllActive(true); });
     $('hideAllBtn').addEventListener('click', function(){ setAllActive(false); });
     $('checkBtn').addEventListener('click', function(){
-      manualCopyBox.style.display = 'none';
-      checkBox.style.display = checkBox.style.display === 'block' ? 'none' : 'block';
+      var open = checkBox.style.display === 'block';
+      closePanels();
+      checkBox.style.display = open ? 'none' : 'block';
       renderCheck();
     });
     checkBox.addEventListener('click', function(){ checkBox.style.display = 'none'; });
@@ -655,15 +823,36 @@
       try { win = window.open(url, '_blank'); } catch (e) {}
       // Wix-iFrame blockiert Pop-ups manchmal → dann Link zum Antippen anbieten
       if (!win) { showManualCopy(t, url); showNotice('Bitte grünen Knopf antippen'); return; }
-      showNotice(saved ? 'WhatsApp geöffnet & Kiste gespeichert' : 'WhatsApp geöffnet');
+      showNotice(saved === 'new' ? 'WhatsApp geöffnet & Kiste gespeichert'
+        : saved === 'updated' ? 'WhatsApp geöffnet & Kiste aktualisiert' : 'WhatsApp geöffnet');
     });
     $('saveSaleBtn').addEventListener('click', saveCurrentSale);
     $('dailyCloseBtn').addEventListener('click', function(){
+      var open = dayBox.style.display === 'block';
+      closePanels();
+      dayBox.style.display = open ? 'none' : 'block';
+      renderDayBox();
+    });
+    $('copyDailyBtn').addEventListener('click', function(){
       var t = buildDailyCloseText();
       if (!t) { showNotice('Heute noch keine Kiste gespeichert'); return; }
+      dayBox.style.display = 'none';
       copyOrShow(t, 'Tagesabschluss kopiert');
     });
-    $('resetBtn').addEventListener('click', function(){ resetCurrentOrder(); showNotice('Zurückgesetzt'); });
+    $('closeDayBtn').addEventListener('click', function(){ dayBox.style.display = 'none'; });
+    $('resetBtn').addEventListener('click', function(){
+      var sale = getCurrentSaleItems();
+      if (!sale.items.length && !getCustomerName()) { showNotice('Kiste ist schon leer'); return; }
+      // Alles merken, damit „Rückgängig“ die Kiste wiederherstellen kann
+      var snap = { state: JSON.parse(JSON.stringify(state)), customer: customerInput.value,
+                   id: currentSaleId, sig: lastSavedSignature };
+      resetCurrentOrder();
+      showNotice('Kiste geleert', 'Rückgängig', function(){
+        state = snap.state; customerInput.value = snap.customer;
+        currentSaleId = snap.id; lastSavedSignature = snap.sig;
+        renderAll();
+      });
+    });
     $('selectManualTextBtn').addEventListener('click', selectManualText);
     $('closeManualCopyBtn').addEventListener('click', function(){ manualCopyBox.style.display = 'none'; });
 
