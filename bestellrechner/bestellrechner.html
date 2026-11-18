@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Bestellrechner Abhof Grafinger</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="format-detection" content="telephone=no" />
+  <style>
+    :root {
+      --green: #2f6627; --green-dark: #255021; --green-soft: #e6f2e3;
+      --red: #c0392b; --red-dark: #962d22; --border: #ddd; --grey: #f3f3f3; --yellow: #fff7d6;
+      --tap: 44px; /* empfohlene Mindestgröße für Finger */
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html {
+      height: 100%;
+      -webkit-text-size-adjust: 100%; text-size-adjust: 100%; /* iOS vergrößert Text im Querformat sonst selbst */
+    }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; margin: 0; padding: 0; color: #222; background: #fafafa;
+      /* Im Wix-iFrame entspricht 100vh/100dvh der Höhe des Einbettungs-Elements */
+      height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden;
+    }
+    button, input, .tile { touch-action: manipulation; } /* kein Doppeltipp-Zoom, keine 300ms Verzögerung */
+
+    .scroll-area {
+      flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain; padding: 8px 10px 16px;
+    }
+    .top-bar {
+      flex: 0 0 auto; background: #fff; border-bottom: 2px solid var(--border);
+      padding: calc(6px + env(safe-area-inset-top, 0px)) 10px 6px; z-index: 5;
+      box-shadow: 0 2px 6px rgba(0,0,0,.05);
+    }
+    h1 { color: var(--green); text-align: center; margin: 0 0 6px; font-size: 18px; line-height: 1.2; }
+    .scroll-area h2:first-child { margin-top: 4px; }
+    h2 { font-size: 16px; margin: 14px 2px 8px; color: #444; }
+
+    .customer-box input {
+      width: 100%; font-size: 17px; padding: 0 12px; height: var(--tap); border: 2px solid var(--green);
+      border-radius: 10px; font-weight: 700; margin-bottom: 6px; background: #fff; color: #222;
+    }
+    .toolbar { display: flex; gap: 6px; }
+    .toolbar input {
+      flex: 1; min-width: 0; font-size: 16px; /* ≥16px verhindert Auto-Zoom auf iPhone */
+      height: var(--tap); padding: 0 11px; border: 1px solid #ccc; border-radius: 10px; background: #fff; color: #222;
+    }
+    .toolbar button { white-space: nowrap; min-height: var(--tap); padding: 0 14px; }
+    .hint { font-size: 12px; color: #777; text-align: center; margin: 5px 0 0; }
+    .edit-banner {
+      display: none; background: var(--yellow); border: 1px solid #e0c34f; border-radius: 10px;
+      padding: 8px; font-size: 13px; text-align: center; margin: 6px 0 0;
+    }
+    .edit-banner .row { display: flex; gap: 6px; justify-content: center; margin-top: 6px; }
+    .edit-banner .row button { flex: 1; max-width: 160px; min-height: 40px; }
+    body.edit .edit-banner { display: block; }
+    body.edit .hint { display: none; }
+
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    @media (max-width: 330px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (min-width: 600px) { .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; } }
+    .tile {
+      position: relative; background: #fff; border: 2px solid var(--border); border-radius: 12px;
+      padding: 8px 7px 7px; min-height: 100px; display: flex; flex-direction: column; justify-content: space-between;
+      user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: pointer;
+      transition: transform .08s, background .15s, border-color .15s;
+    }
+    .tile.pressed { transform: scale(.96); }
+    .tile.has { border-color: var(--green); background: var(--green-soft); }
+    .tile.flash-minus { background: #fbe3e0; border-color: var(--red); }
+    .tile .name { font-weight: 800; font-size: 14px; line-height: 1.15; overflow-wrap: break-word; -webkit-hyphens: auto; hyphens: auto; padding-right: 8px; }
+    .tile.has .name { color: var(--green-dark); }
+    .tile .unit { font-size: 11.5px; color: #666; margin-top: 2px; }
+    .tile .bottom { display: flex; justify-content: space-between; align-items: flex-end; gap: 4px; margin-top: 4px; }
+    .tile .price { font-size: 12px; color: #555; }
+    .tile .sum { font-size: 13px; font-weight: 800; color: var(--green); }
+    .tile .bottom span { white-space: nowrap; }
+    @media (max-width: 400px) { .tile.has .price { display: none; } .tile.has .bottom { justify-content: flex-end; } }
+    .badge {
+      position: absolute; top: -8px; right: -6px; min-width: 28px; height: 28px; border-radius: 14px; padding: 0 7px;
+      background: var(--green); color: #fff; font-weight: 800; font-size: 14px; display: none;
+      align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,.25); pointer-events: none;
+    }
+    .tile.has .badge { display: flex; }
+    .gram-wrap { display: flex; align-items: center; gap: 3px; margin-top: 5px; }
+    .gram-wrap input {
+      width: 100%; min-width: 0; height: 36px; font-size: 16px; padding: 0 6px; border: 1px solid #bbb;
+      border-radius: 8px; text-align: right; background: #fff; color: #222;
+    }
+    .gram-wrap span { font-size: 12px; color: #555; }
+    body.edit .tile.inactive { opacity: .35; border-style: dashed; }
+    body.edit .gram-wrap input { pointer-events: none; }
+    .empty { grid-column: 1 / -1; color: #777; font-size: 13px; text-align: center; padding: 10px; }
+
+    button {
+      padding: 8px 10px; font-size: 15px; font-family: inherit; border: none; border-radius: 10px; background: var(--green);
+      color: #fff; cursor: pointer; min-height: 40px;
+    }
+    button:active { background: var(--green-dark); }
+    .btn-neutral { background: #555; } .btn-neutral:active { background: #333; }
+    .btn-danger { background: var(--red); } .btn-danger:active { background: var(--red-dark); }
+
+    .dock { position: relative; flex: 0 0 auto; z-index: 10; }
+    .footer-total {
+      background: #fff; border-top: 2px solid var(--border);
+      padding: 6px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+      box-shadow: 0 -2px 6px rgba(0,0,0,.05);
+    }
+    .footer-total .figures { text-align: center; font-weight: 800; color: var(--green); font-size: 17px; margin-bottom: 6px; }
+    .footer-total .actions { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
+    .footer-total .actions button { font-size: 13px; padding: 0 2px; min-width: 0; min-height: var(--tap); line-height: 1.1; }
+    @media (max-width: 350px) { .footer-total .actions button { font-size: 11.5px; } .tile .name { font-size: 13px; } }
+
+    /* Hinweis als kleines Toast über der Leiste – spart eine ganze Zeile Platz */
+    #copyNotice {
+      position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%);
+      max-width: calc(100% - 24px); background: #333; color: #fff; font-size: 13px; text-align: center;
+      padding: 7px 12px; border-radius: 18px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 30;
+    }
+    #copyNotice.show { opacity: .95; }
+
+    .check-box, .manual-copy-box {
+      display: none; position: absolute; left: 8px; right: 8px; bottom: calc(100% + 8px);
+      border-radius: 12px; padding: 10px 12px; box-shadow: 0 4px 18px rgba(0,0,0,0.18);
+      max-height: calc(100vh - 150px); max-height: calc(100dvh - 150px); overflow-y: auto; overscroll-behavior: contain;
+    }
+    .check-box { background: #fff; border: 2px solid var(--green); }
+    .check-box h3 { margin: 0 0 6px; color: var(--green); font-size: 17px; }
+    .check-box ul { list-style: none; margin: 0; padding: 0; }
+    .check-box li { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 15px; }
+    .check-box .check-total { display: flex; justify-content: space-between; font-weight: 800; padding-top: 8px; font-size: 16px; }
+    .check-box .check-close { font-size: 12px; color: #777; text-align: center; margin-top: 8px; }
+    .manual-copy-box { background: var(--yellow); border: 2px solid #e0c34f; z-index: 20; }
+    .manual-copy-box strong { display: block; margin-bottom: 6px; }
+    .manual-copy-box textarea { width: 100%; min-height: 150px; font-size: 16px; padding: 8px; border-radius: 8px; border: 1px solid #c9b03f; font-family: inherit; }
+    .manual-copy-box .wa-link {
+      display: none; text-align: center; background: var(--green); color: #fff; text-decoration: none;
+      font-weight: 700; border-radius: 10px; padding: 12px; margin-bottom: 8px;
+    }
+    .manual-copy-actions { display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end; }
+
+    /* Niedrige Einbettung (z. B. Wix-Element nicht bildschirmhoch oder Querformat): Kopf verkleinern */
+    @media (max-height: 700px) { .hint { display: none; } }
+    @media (max-height: 620px) {
+      h1 { display: none; }
+      .customer-box input, .toolbar input, .toolbar button { height: 40px; min-height: 40px; }
+      .footer-total .figures { font-size: 15px; margin-bottom: 4px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="top-bar">
+    <h1>Bestellrechner</h1>
+    <div class="customer-box">
+      <input id="customerName" type="text" placeholder="Kiste für … (Kundenname)" aria-label="Kundenname"
+             autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" enterkeyhint="done" />
+    </div>
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="Suchen…" aria-label="Produkte suchen"
+             autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" />
+      <button class="btn-neutral" id="editBtn" type="button">Angebot</button>
+    </div>
+    <div class="hint">Tippen +1 · Lang drücken −1 · Gramm ins Feld</div>
+    <div class="edit-banner">
+      Angebot bearbeiten: Kachel antippen = ein-/ausblenden. Danach „Fertig“ drücken.
+      <div class="row">
+        <button class="btn-neutral" id="showAllBtn" type="button">Alle an</button>
+        <button class="btn-neutral" id="hideAllBtn" type="button">Alle aus</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="scroll-area" id="scrollArea">
+    <h2>Gemüse</h2>
+    <div class="grid" id="gridVeg"></div>
+    <h2>Hofprodukte</h2>
+    <div class="grid" id="gridHerb"></div>
+  </main>
+
+  <div class="dock">
+    <div id="copyNotice" role="status" aria-live="polite"></div>
+
+    <div class="manual-copy-box" id="manualCopyBox">
+      <strong id="manualCopyTitle">Automatisch kopieren ist hier blockiert.</strong>
+      <a class="wa-link" id="waLink" href="#" target="_blank" rel="noopener">WhatsApp öffnen</a>
+      <div id="manualCopyInfo" style="font-size:13px;color:#444;margin-bottom:8px;">Textfeld antippen, alles markieren und manuell kopieren.</div>
+      <textarea id="manualCopyText" readonly></textarea>
+      <div class="manual-copy-actions">
+        <button class="btn-neutral" id="selectManualTextBtn" type="button">Text markieren</button>
+        <button class="btn-danger" id="closeManualCopyBtn" type="button">Schließen</button>
+      </div>
+    </div>
+
+    <div class="check-box" id="checkBox">
+      <h3 id="checkTitle">Kisten-Check</h3>
+      <ul id="checkList"></ul>
+      <div class="check-total"><span>Gesamt</span><span id="checkTotal">0,00 €</span></div>
+      <div class="check-close">Antippen zum Schließen</div>
+    </div>
+
+    <div class="footer-total">
+      <div class="figures"><span id="itemCount">0</span> Artikel – Gesamt: <span id="total">0,00</span> €</div>
+      <div class="actions">
+        <button class="btn-neutral" id="checkBtn" type="button" title="Inhalt der aktuellen Kiste anzeigen">Check</button>
+        <button id="waBtn" type="button" title="WhatsApp mit Rechnungstext öffnen">WA</button>
+        <button id="saveSaleBtn" type="button" title="Kiste im Tagesabschluss speichern">Speichern</button>
+        <button id="dailyCloseBtn" type="button" title="Tagesabschluss kopieren">Abschluss</button>
+        <button class="btn-danger" id="resetBtn" type="button" title="Alle Mengen löschen">Löschen</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var veggies = [
+      { name: 'Auberginen', unit: '1 Stück', price: 2.50, active: true },
+      { name: 'Basilikum', unit: '1 Bund', price: 2.00, active: true },
+      { name: 'Blattkohl', unit: '1 Bund', price: 2.80, active: true },
+      { name: 'Blumenkohl', unit: '1 Stück', price: 2.50, active: true },
+      { name: 'Brokkoli', unit: '1 Stück', price: 2.50, active: true },
+      { name: 'Chili Mix', pricePerKg: 18.00, defaultGrams: 100, active: true },
+      { name: 'Dill', unit: '1 Bund', price: 2.00, active: true },
+      { name: 'Feldsalat (Vogerlsalat)', pricePerKg: 18.00, defaultGrams: 100, active: true },
+      { name: 'Fenchel', unit: '1 Stück', price: 2.30, active: true },
+      { name: 'Fisolen', pricePerKg: 7.00, defaultGrams: 500, active: true },
+      { name: 'Frühlingszwiebel', unit: '1 Bund', price: 1.80, active: true },
+      { name: 'Grünkohl', unit: '1 Bund', price: 2.80, active: true },
+      { name: 'Gurke', unit: '1 Stück', price: 1.50, active: true },
+      { name: 'Ingwer', pricePerKg: 20.00, defaultGrams: 100, active: true },
+      { name: 'Kapuzinerkresse', unit: '1 Bund', price: 2.00, active: true },
+      { name: 'Karotten', unit: '1 Bund', price: 2.50, active: true },
+      { name: 'Knoblauch', unit: '1 Stück', price: 1.20, active: true },
+      { name: 'Kohlrabi', unit: '1 Stück', price: 1.50, active: true },
+      { name: 'Koriander', unit: '1 Bund', price: 2.00, active: true },
+      { name: 'Kräuter Bund', unit: '1 Bund', price: 2.30, active: true },
+      { name: 'Kürbis (Hokkaido)', pricePerKg: 3.00, defaultGrams: 1000, active: true },
+      { name: 'Kürbis (Pattison Blanc)', pricePerKg: 3.00, defaultGrams: 1000, active: true },
+      { name: 'Lagerzwiebel', pricePerKg: 2.50, defaultGrams: 1000, active: true },
+      { name: 'Lauch', unit: '1 Stück', price: 2.00, active: true },
+      { name: 'Mangold', unit: '1 Bund', price: 2.50, active: true },
+      { name: 'Melone / Wassermelone', unit: '1 Stück', price: 4.00, active: true },
+      { name: 'Minipaprika', unit: '1 Stück', price: 1.20, active: true },
+      { name: 'Minze', unit: '1 Bund', price: 2.00, active: true },
+      { name: 'Pak Choi', unit: '1 Stück', price: 2.30, active: true },
+      { name: 'Palmkohl (Schwarzkohl, Cavolo Nero)', unit: '1 Bund', price: 2.80, active: true },
+      { name: 'Paprika', unit: '1 Stück', price: 1.60, active: true },
+      { name: 'Petersilie', unit: '1 Bund', price: 1.80, active: true },
+      { name: 'Petersilwurzel', pricePerKg: 7.00, defaultGrams: 300, active: true },
+      { name: 'Pfefferoni', unit: '1 Bund', price: 2.30, active: true },
+      { name: 'Postelein', pricePerKg: 18.00, defaultGrams: 100, active: true },
+      { name: 'Radieschen', unit: '1 Bund', price: 2.00, active: true },
+      { name: 'Rosenkohl', pricePerKg: 8.00, defaultGrams: 300, active: true },
+      { name: 'Rote Bete', pricePerKg: 2.80, defaultGrams: 700, active: true },
+      { name: 'Rucola', pricePerKg: 18.00, defaultGrams: 100, active: true },
+      { name: 'Salat (Kopf)', unit: '1 Stück', price: 2.30, active: true },
+      { name: 'Schalotten', pricePerKg: 10.00, defaultGrams: 250, active: true },
+      { name: 'Schnittlauch', unit: '1 Bund', price: 1.80, active: true },
+      { name: 'Schnittsalat', pricePerKg: 12.50, defaultGrams: 200, active: true },
+      { name: 'Schnittsellerie', unit: '1 Bund', price: 2.00, active: true },
+      { name: 'Spinat', pricePerKg: 12.50, defaultGrams: 200, active: true },
+      { name: 'Spitzkohl', unit: '1 Stück', price: 2.80, active: true },
+      { name: 'Stangensellerie', unit: '1 Bund', price: 2.50, active: true },
+      { name: 'Suppengemüse', unit: '1 Bund', price: 2.50, active: true },
+      { name: 'Tomaten (Fleisch)', pricePerKg: 7.50, defaultGrams: 1000, active: true },
+      { name: 'Tomaten Mix', pricePerKg: 8.00, defaultGrams: 500, active: true },
+      { name: 'Winterheckenzwiebel', unit: '1 Bund', price: 1.80, active: true },
+      { name: 'Zucchini', unit: '1 Stück', price: 1.80, active: true },
+      { name: 'Zuckerhut', unit: '1 Stück', price: 2.00, active: true },
+      { name: 'Zwiebel', unit: '1 Bund', price: 2.00, active: true }
+    ];
+
+    var herbs = [
+      { name: 'Hollersaft', unit: '1 Flasche', price: 3.00, active: true },
+      { name: 'Kirschenmarmelade', unit: '1 Glas', price: 3.00, active: true },
+      { name: 'Marillenmarmelade', unit: '1 Glas', price: 3.00, active: true },
+      { name: 'Jausenwurst vom Lamm', unit: '1 Stück', price: 7.00, active: true },
+      { name: 'Käsekrainer', unit: 'Packung à 5 Stk', price: 8.00, active: true },
+      { name: 'Eier', unit: '1 Packung', price: 4.00, active: true },
+      { name: 'Tomaten Pesto', unit: '1 Glas', price: 4.00, active: true },
+      { name: 'Kräuter Pesto', unit: '1 Glas', price: 4.00, active: true },
+      { name: 'Passierte Tomaten', pricePerKg: 7.00, defaultGrams: 500, active: true },
+      { name: 'Getrocknete Tomaten', unit: '1 Glas', price: 4.00, active: true }
+    ];
+
+    var CATEGORIES = [
+      { type: 'veg', list: veggies, grid: 'gridVeg' },
+      { type: 'herb', list: herbs, grid: 'gridHerb' }
+    ];
+
+    // Gleiche Speicher wie bisher: Angebot und Tagesabschluss bleiben erhalten
+    var STORAGE_KEY = 'abhof-grafinger-bestellrechner-angebot-v1';
+    var SALES_KEY = 'abhof-grafinger-tagesverkaeufe-v1';
+    var LONG_MS = 450;
+
+    var state = {};          // key -> Anzahl (Stück) bzw. Gramm gesamt (Gewicht)
+    var editMode = false;
+    var lastSavedSignature = '';
+
+    var $ = function(id){ return document.getElementById(id); };
+    var customerInput = $('customerName'), searchInput = $('search'), checkBox = $('checkBox');
+    var manualCopyBox = $('manualCopyBox'), manualCopyText = $('manualCopyText'), copyNotice = $('copyNotice');
+
+    function formatEuro(n) {
+      try { return n.toLocaleString('de-AT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+      catch (e) { return (Math.round(n * 100) / 100).toFixed(2).replace('.', ','); }
+    }
+    function productKey(type, name) { return type + '|' + name; }
+
+    // Feste Trennstellen für lange Namen (| = Trennstelle), damit auf schmalen Handys sauber umgebrochen wird
+    var HYPH = ['Winter|hecken|zwiebel','Schnitt|salat','Schnitt|sellerie','Stangen|sellerie','Suppen|gemüse','Ge|trock|nete',
+      'Jausen|wurst','Käse|krainer','Kirschen|marmelade','Marillen|marmelade','Frühlings|zwiebel','Petersil|wurzel',
+      'Kapuziner|kresse','Lager|zwiebel','Vogerl|salat','Schwarz|kohl','Mini|paprika','Pfeffe|roni','Schnitt|lauch',
+      'Holler|saft','Blumen|kohl','Auber|ginen','Radies|chen','Rosen|kohl','Spitz|kohl','Grün|kohl','Palm|kohl',
+      'Blatt|kohl','Feld|salat','Zucker|hut','Passier|te','Kohl|rabi','Knob|lauch','Karot|ten','Toma|ten','Petersi|lie',
+      'Basili|kum','Korian|der'];
+    function hyphenate(name) {
+      var out = name;
+      HYPH.forEach(function(w){ var plain = w.replace(/\|/g, ''); out = out.split(plain).join(w.replace(/\|/g, '­')); });
+      return out;
+    }
+    function isWeight(p) { return typeof p.pricePerKg === 'number'; }
+    function lineSum(p, v) { return isWeight(p) ? p.pricePerKg * v / 1000 : p.price * v; }
+    function safeGetStorage(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+    function safeSetStorage(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+    function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
+
+    function showNotice(msg) {
+      copyNotice.textContent = msg;
+      copyNotice.classList.add('show');
+      clearTimeout(showNotice.t);
+      showNotice.t = setTimeout(function(){ copyNotice.classList.remove('show'); }, 2500);
+    }
+    function getCustomerName() { return customerInput.value.replace(/\s+/g, ' ').trim(); }
+
+    // ---------- Angebot ----------
+    function loadAvailability() {
+      try {
+        var map = JSON.parse(safeGetStorage(STORAGE_KEY) || '{}');
+        CATEGORIES.forEach(function(c){ c.list.forEach(function(p){
+          var k = productKey(c.type, p.name);
+          if (typeof map[k] !== 'undefined') p.active = !!map[k];
+        }); });
+      } catch (e) {}
+    }
+    function saveAvailability() {
+      var map = {};
+      CATEGORIES.forEach(function(c){ c.list.forEach(function(p){ map[productKey(c.type, p.name)] = !!p.active; }); });
+      safeSetStorage(STORAGE_KEY, JSON.stringify(map));
+    }
+    function setAllActive(on) {
+      CATEGORIES.forEach(function(c){ c.list.forEach(function(p){ p.active = on; }); });
+      saveAvailability(); renderAll();
+    }
+
+    // ---------- Kacheln ----------
+    function renderAll() {
+      var term = searchInput.value.trim().toLowerCase();
+      CATEGORIES.forEach(function(c){
+        var grid = $(c.grid); grid.innerHTML = '';
+        var list = c.list.slice().sort(function(a,b){ return a.name.localeCompare(b.name); }).filter(function(p){
+          if (term && p.name.toLowerCase().indexOf(term) === -1) return false;
+          if (!editMode && !term && !p.active) return false;
+          return true;
+        });
+        if (!list.length) {
+          grid.innerHTML = '<div class="empty">' + (term ? 'Nichts gefunden.' : 'Nichts im Angebot – „Angebot“ drücken zum Einblenden.') + '</div>';
+          return;
+        }
+        list.forEach(function(p){ grid.appendChild(makeTile(c, p)); });
+      });
+      updateTotal();
+    }
+
+    function makeTile(c, p) {
+      var k = productKey(c.type, p.name);
+      var t = document.createElement('div');
+      t.className = 'tile' + (p.active ? '' : ' inactive');
+      var unitTxt = isWeight(p) ? (formatEuro(p.pricePerKg) + ' €/kg') : p.unit;
+      var priceTxt = isWeight(p) ? ('Portion ' + (p.defaultGrams >= 1000 ? (p.defaultGrams / 1000) + ' kg' : p.defaultGrams + ' g')) : (formatEuro(p.price) + ' €');
+      t.innerHTML =
+        '<div class="badge"></div>' +
+        '<div><div class="name"></div><div class="unit">' + unitTxt + '</div></div>' +
+        (isWeight(p) ? '<div class="gram-wrap"><input type="number" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" min="0" step="10" placeholder="0" aria-label="Gramm" /><span>g</span></div>' : '') +
+        '<div class="bottom"><span class="price">' + priceTxt + '</span><span class="sum"></span></div>';
+      t.querySelector('.name').textContent = hyphenate(p.name);
+
+      var input = t.querySelector('input');
+      if (input) {
+        input.addEventListener('input', function(){
+          var v = parseInt(input.value, 10);
+          state[k] = isNaN(v) || v < 0 ? 0 : v;
+          paint(t, p, k, true); updateTotal();
+        });
+        input.addEventListener('focus', function(){ try { input.select(); } catch (e) {} });
+        // "Fertig"/Enter auf der Handy-Tastatur schließt die Tastatur
+        input.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
+        ['pointerdown', 'pointerup', 'click'].forEach(function(ev){
+          input.addEventListener(ev, function(e){ e.stopPropagation(); });
+        });
+      }
+      bindPress(t, function(){ tap(t, p, k); }, function(){ longPress(t, p, k); });
+      t.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+      paint(t, p, k, false);
+      return t;
+    }
+
+    function paint(t, p, k, fromInput) {
+      var v = state[k] || 0;
+      t.classList.toggle('has', v > 0);
+      t.querySelector('.badge').textContent = isWeight(p)
+        ? (v >= 1000 ? formatEuro(v / 1000).replace(',00', '') + ' kg' : v + ' g')
+        : v;
+      t.querySelector('.sum').textContent = v > 0 ? formatEuro(lineSum(p, v)) + ' €' : '';
+      var input = t.querySelector('input');
+      if (input && !fromInput) input.value = v > 0 ? v : '';
+    }
+
+    // Tippen vs. langes Drücken (Scrollen wird erkannt und zählt nicht)
+    function bindPress(el, onTap, onLong) {
+      var timer = null, fired = false, sx = 0, sy = 0, down = false;
+      el.addEventListener('pointerdown', function(e){
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        down = true; fired = false; sx = e.clientX; sy = e.clientY;
+        clearTimeout(el._pt); el._pt = setTimeout(function(){ if (down) el.classList.add('pressed'); }, 90);
+        timer = setTimeout(function(){ fired = true; el.classList.remove('pressed'); onLong(); }, LONG_MS);
+      });
+      el.addEventListener('pointermove', function(e){
+        if (down && (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10)) cancel();
+      });
+      function cancel() { down = false; clearTimeout(timer); clearTimeout(el._pt); el.classList.remove('pressed'); }
+      el.addEventListener('pointerup', function(){
+        if (!down) return;
+        var wasFired = fired; cancel();
+        if (!wasFired) onTap();
+      });
+      el.addEventListener('pointercancel', cancel);
+      el.addEventListener('pointerleave', cancel);
+    }
+
+    function tap(t, p, k) {
+      if (editMode) {
+        p.active = !p.active; saveAvailability();
+        t.classList.toggle('inactive', !p.active); return;
+      }
+      // Offene Tastatur (Gramm-/Namensfeld) beim Antippen einer Kachel schließen
+      if (document.activeElement && document.activeElement.tagName === 'INPUT') document.activeElement.blur();
+      state[k] = (state[k] || 0) + (isWeight(p) ? p.defaultGrams : 1);
+      buzz(15); paint(t, p, k, false); updateTotal();
+    }
+
+    function longPress(t, p, k) {
+      if (editMode) return;
+      var v = state[k] || 0;
+      if (v <= 0) return;
+      v -= isWeight(p) ? p.defaultGrams : 1;
+      state[k] = v < 0 ? 0 : v;
+      buzz([30, 40, 30]);
+      t.classList.add('flash-minus'); setTimeout(function(){ t.classList.remove('flash-minus'); }, 250);
+      paint(t, p, k, false); updateTotal();
+    }
+
+    // ---------- Summen ----------
+    function getCurrentSaleItems() {
+      var items = [], total = 0;
+      CATEGORIES.forEach(function(c){ c.list.slice().sort(function(a,b){ return a.name.localeCompare(b.name); }).forEach(function(p){
+        var v = state[productKey(c.type, p.name)] || 0;
+        if (v <= 0) return;
+        var s = lineSum(p, v); total += s;
+        items.push(isWeight(p)
+          ? { name: p.name, unit: v + ' g', qty: 1, price: s, sum: s, weight: true, grams: v }
+          : { name: p.name, unit: p.unit, qty: v, price: p.price, sum: s, weight: false, grams: 0 });
+      }); });
+      return { items: items, total: total };
+    }
+
+    function updateTotal() {
+      var s = getCurrentSaleItems(), n = 0;
+      s.items.forEach(function(i){ n += i.qty; });
+      $('total').textContent = formatEuro(s.total);
+      $('itemCount').textContent = n;
+      renderCheck();
+    }
+
+    function renderCheck() {
+      if (checkBox.style.display !== 'block') return;
+      var sale = getCurrentSaleItems(), name = getCustomerName();
+      $('checkTitle').textContent = 'Kisten-Check' + (name ? ' – ' + name : '');
+      var list = $('checkList'); list.innerHTML = '';
+      if (!sale.items.length) list.innerHTML = '<li><span>Noch nichts in der Kiste</span></li>';
+      sale.items.forEach(function(it){
+        var li = document.createElement('li');
+        var a = document.createElement('span'); a.textContent = it.qty + 'x ' + it.name + (it.weight ? ' (' + it.unit + ')' : '');
+        var b = document.createElement('span'); b.textContent = formatEuro(it.sum) + ' €';
+        li.appendChild(a); li.appendChild(b); list.appendChild(li);
+      });
+      $('checkTotal').textContent = formatEuro(sale.total) + ' €';
+    }
+
+    // ---------- Kundennachricht ----------
+    function buildInvoiceText() {
+      var sale = getCurrentSaleItems();
+      if (!sale.items.length) return '';
+      var lines = [];
+      var cname = getCustomerName();
+      lines.push(cname ? 'Hallo ' + cname + ',' : 'Hallo,');
+      lines.push('danke für deine Bestellung!');
+      lines.push('Sie kann ab 15:00 Uhr jederzeit abgeholt werden.');
+      lines.push('');
+      lines.push('Das ist drin:');
+      sale.items.forEach(function(it){ lines.push(it.qty + 'x ' + it.name + (it.weight ? ' (' + it.unit + ')' : '')); });
+      lines.push('');
+      lines.push('Gesamt: ' + formatEuro(sale.total) + '€');
+      lines.push('');
+      lines.push('Bezahlen per Handy:');
+      lines.push('https://bit.ly/paygemüse');
+      lines.push('oder bar bei Abholung.');
+      lines.push('');
+      lines.push('Liebe Grüße vom Abhof Grafinger');
+      return lines.join('\n');
+    }
+
+    // ---------- Tagesabschluss ----------
+    function todayKey() {
+      var d = new Date(); function z(n){ return (n < 10 ? '0' : '') + n; }
+      return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate());
+    }
+    function loadSales() { try { return JSON.parse(safeGetStorage(SALES_KEY) || '{}'); } catch (e) { return {}; } }
+    function saveSales(data) { safeSetStorage(SALES_KEY, JSON.stringify(data)); }
+    function saleSignature(sale) {
+      return getCustomerName() + '##' + sale.items.map(function(it){ return it.name + '|' + it.qty + '|' + it.price; }).join('||') + '::' + formatEuro(sale.total);
+    }
+    function addSaleToDailyClose(sale) {
+      var data = loadSales(), day = todayKey();
+      if (!data[day]) data[day] = [];
+      data[day].push({ time: new Date().toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' }), customer: getCustomerName(), items: sale.items, total: sale.total });
+      saveSales(data);
+    }
+    function autoSaveCurrentSale() {
+      var sale = getCurrentSaleItems();
+      if (!sale.items.length) return false;
+      var sig = saleSignature(sale);
+      if (sig === lastSavedSignature) return false;
+      addSaleToDailyClose(sale); lastSavedSignature = sig;
+      return true;
+    }
+    function saveCurrentSale() {
+      var sale = getCurrentSaleItems();
+      if (!sale.items.length) { showNotice('Nichts ausgewählt'); return; }
+      var who = getCustomerName();
+      if (saleSignature(sale) !== lastSavedSignature) addSaleToDailyClose(sale);
+      resetCurrentOrder();
+      showNotice((who ? 'Kiste ' + who : 'Kiste') + ' gespeichert – nächste Kiste');
+      $('scrollArea').scrollTop = 0;
+    }
+
+    function buildDailyCloseText() {
+      var sales = loadSales()[todayKey()] || [];
+      if (!sales.length) return '';
+      var total = 0, productMap = {};
+      sales.forEach(function(s){
+        total += s.total || 0;
+        (s.items || []).forEach(function(it){
+          if (!productMap[it.name]) productMap[it.name] = { qty: 0, grams: 0, weight: !!it.weight };
+          productMap[it.name].qty += it.qty || 0;
+          if (it.weight) productMap[it.name].grams += (it.grams || 0) * (it.qty || 0);
+        });
+      });
+      var lines = ['Tagesabschluss Abhof Grafinger', todayKey().split('-').reverse().join('.'), '',
+        'Kisten: ' + sales.length, 'Umsatz gesamt: ' + formatEuro(total) + '€', '', 'Kisten pro Kunde:'];
+      sales.forEach(function(s, i){
+        lines.push('- ' + (s.customer ? s.customer : 'Kiste ' + (i + 1)) + ': ' + formatEuro(s.total || 0) + '€');
+      });
+      lines.push('', 'Verkaufte Produkte:');
+      Object.keys(productMap).sort(function(a,b){ return a.localeCompare(b); }).forEach(function(n){
+        var p = productMap[n];
+        lines.push(p.weight ? (p.grams + ' g ' + n) : (p.qty + 'x ' + n));
+      });
+      lines.push('', 'Liebe Grüße vom Abhof Grafinger');
+      return lines.join('\n');
+    }
+
+    // ---------- Kopieren ----------
+    function showManualCopy(text, waUrl) {
+      var waLink = $('waLink');
+      if (waUrl) {
+        // Wix-iFrame hat das Öffnen blockiert → Link zum direkten Antippen anbieten
+        $('manualCopyTitle').textContent = 'WhatsApp konnte nicht automatisch geöffnet werden.';
+        $('manualCopyInfo').textContent = 'Grünen Knopf antippen – oder den Text unten manuell kopieren.';
+        waLink.href = waUrl; waLink.style.display = 'block';
+      } else {
+        $('manualCopyTitle').textContent = 'Automatisch kopieren ist hier blockiert.';
+        $('manualCopyInfo').textContent = 'Textfeld antippen, alles markieren und manuell kopieren.';
+        waLink.style.display = 'none';
+      }
+      checkBox.style.display = 'none';
+      manualCopyText.value = text; manualCopyBox.style.display = 'block';
+      if (!waUrl) setTimeout(selectManualText, 50);
+    }
+    function selectManualText() {
+      manualCopyText.focus(); manualCopyText.select();
+      try { manualCopyText.setSelectionRange(0, manualCopyText.value.length); } catch (e) {}
+    }
+    function legacyCopy(text) {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', 'readonly');
+      ta.style.position = 'fixed'; ta.style.left = '-9999px'; ta.style.top = '0'; ta.style.fontSize = '16px';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      try { ta.setSelectionRange(0, text.length); } catch (e) {}
+      var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta); return ok;
+    }
+    function copyOrShow(text, okMsg) {
+      function fallback() {
+        if (legacyCopy(text)) { showNotice(okMsg); return; }
+        showManualCopy(text); showNotice('Kopieren blockiert – Text manuell kopieren');
+      }
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function(){ showNotice(okMsg); }).catch(fallback);
+        else fallback();
+      } catch (e) { fallback(); }
+    }
+
+    function resetCurrentOrder() {
+      state = {}; lastSavedSignature = '';
+      customerInput.value = '';
+      checkBox.style.display = 'none';
+      manualCopyBox.style.display = 'none';
+      renderAll();
+    }
+
+    // ---------- Buttons ----------
+    searchInput.addEventListener('input', renderAll);
+    searchInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); searchInput.blur(); } });
+    customerInput.addEventListener('input', renderCheck);
+    customerInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); customerInput.blur(); } });
+    $('editBtn').addEventListener('click', function(){
+      editMode = !editMode;
+      document.body.classList.toggle('edit', editMode);
+      this.textContent = editMode ? 'Fertig' : 'Angebot';
+      renderAll();
+    });
+    $('showAllBtn').addEventListener('click', function(){ setAllActive(true); });
+    $('hideAllBtn').addEventListener('click', function(){ setAllActive(false); });
+    $('checkBtn').addEventListener('click', function(){
+      manualCopyBox.style.display = 'none';
+      checkBox.style.display = checkBox.style.display === 'block' ? 'none' : 'block';
+      renderCheck();
+    });
+    checkBox.addEventListener('click', function(){ checkBox.style.display = 'none'; });
+    $('waBtn').addEventListener('click', function(){
+      var t = buildInvoiceText();
+      if (!t) { showNotice('Nichts ausgewählt'); return; }
+      var saved = autoSaveCurrentSale();
+      var url = 'https://wa.me/?text=' + encodeURIComponent(t);
+      var win = null;
+      try { win = window.open(url, '_blank'); } catch (e) {}
+      // Wix-iFrame blockiert Pop-ups manchmal → dann Link zum Antippen anbieten
+      if (!win) { showManualCopy(t, url); showNotice('Bitte grünen Knopf antippen'); return; }
+      showNotice(saved ? 'WhatsApp geöffnet & Kiste gespeichert' : 'WhatsApp geöffnet');
+    });
+    $('saveSaleBtn').addEventListener('click', saveCurrentSale);
+    $('dailyCloseBtn').addEventListener('click', function(){
+      var t = buildDailyCloseText();
+      if (!t) { showNotice('Heute noch keine Kiste gespeichert'); return; }
+      copyOrShow(t, 'Tagesabschluss kopiert');
+    });
+    $('resetBtn').addEventListener('click', function(){ resetCurrentOrder(); showNotice('Zurückgesetzt'); });
+    $('selectManualTextBtn').addEventListener('click', selectManualText);
+    $('closeManualCopyBtn').addEventListener('click', function(){ manualCopyBox.style.display = 'none'; });
+
+    loadAvailability();
+    renderAll();
+  </script>
+</body>
+</html>
