@@ -52,7 +52,7 @@
       padding: 8px; font-size: 13px; text-align: center; margin: 6px 0 0;
     }
     .edit-banner .row { display: flex; gap: 6px; justify-content: center; margin-top: 6px; }
-    .edit-banner .row button { flex: 1; max-width: 160px; min-height: 40px; }
+    .edit-banner .row button { flex: 1; max-width: 160px; min-height: 40px; font-size: 14px; padding: 4px 6px; line-height: 1.15; }
     body.edit .edit-banner { display: block; }
     body.edit .hint { display: none; }
 
@@ -98,7 +98,22 @@
       border-radius: 8px; text-align: right; background: #fff; color: #222;
     }
     .gram-wrap span { font-size: 12px; color: #555; }
-    body.edit .tile.inactive { opacity: .35; border-style: dashed; }
+    body.edit .tile.inactive { border-style: dashed; background: #f1f1f1; }
+    body.edit .tile.inactive > :not(.price-edit) { opacity: .35; }
+    body.edit .tile .bottom, body.edit .tile .gram-wrap { display: none; }
+    /* Preise direkt auf der Kachel bearbeiten (nur im Angebot-Modus) */
+    .price-edit { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+    .price-edit label { display: flex; align-items: center; gap: 4px; font-size: 11.5px; color: #555; }
+    .price-edit label span { flex: 0 0 auto; min-width: 30px; }
+    .price-edit input {
+      width: 100%; min-width: 0; height: 34px; font-size: 16px; padding: 0 6px; text-align: right;
+      border: 1px solid #c9b03f; border-radius: 7px; background: #fffdf2; color: #222;
+    }
+    .price-edit input.changed { border-color: var(--green); background: var(--green-soft); }
+    .pickup-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; text-align: left; }
+    .pickup-row label { font-weight: 700; white-space: nowrap; }
+    .pickup-row input { flex: 1; min-width: 0; height: 40px; font-size: 16px; padding: 0 10px; border: 1px solid #c9b03f; border-radius: 8px; background: #fff; color: #222; }
+    .pickup-preview { font-size: 12px; color: #6b5a12; margin-top: 4px; text-align: left; }
     body.edit .gram-wrap input { pointer-events: none; }
     .empty { grid-column: 1 / -1; color: #777; font-size: 13px; text-align: center; padding: 10px; }
 
@@ -197,11 +212,17 @@
     </div>
     <div class="hint">Tippen +1 · „−“ zieht ab · Gramm ins Feld</div>
     <div class="edit-banner">
-      Angebot bearbeiten: Kachel antippen = ein-/ausblenden. Danach „Fertig“ drücken.
+      Kachel antippen = ein/aus · Preise in den Feldern ändern
       <div class="row">
         <button class="btn-neutral" id="showAllBtn" type="button">Alle an</button>
         <button class="btn-neutral" id="hideAllBtn" type="button">Alle aus</button>
+        <button class="btn-neutral" id="resetPricesBtn" type="button">Preise Standard</button>
       </div>
+      <div class="pickup-row">
+        <label for="pickupInput">Abholung:</label>
+        <input id="pickupInput" type="text" autocomplete="off" enterkeyhint="done" placeholder="ab 15:00 Uhr jederzeit" />
+      </div>
+      <div class="pickup-preview" id="pickupPreview"></div>
     </div>
   </header>
 
@@ -334,6 +355,10 @@
     // Gleiche Speicher wie bisher: Angebot und Tagesabschluss bleiben erhalten
     var STORAGE_KEY = 'abhof-grafinger-bestellrechner-angebot-v1';
     var SALES_KEY = 'abhof-grafinger-tagesverkaeufe-v1';
+    var PRICE_KEY = 'abhof-grafinger-preise-v1';          // geänderte Preise (nur Abweichungen vom Standard)
+    var SETTINGS_KEY = 'abhof-grafinger-einstellungen-v1'; // z. B. Abholzeit
+    var DEFAULT_PICKUP = 'ab 15:00 Uhr jederzeit';
+    var PRICE_FIELDS = ['price', 'pricePerKg', 'defaultGrams'];
     var LONG_MS = 450;
 
     var state = {};          // key -> Anzahl (Stück) bzw. Gramm gesamt (Gewicht)
@@ -401,6 +426,38 @@
       CATEGORIES.forEach(function(c){ c.list.forEach(function(p){ map[productKey(c.type, p.name)] = !!p.active; }); });
       safeSetStorage(STORAGE_KEY, JSON.stringify(map));
     }
+    // ---------- Preise ----------
+    // Standardpreise aus dem Code merken, dann gespeicherte Änderungen darüberlegen
+    function loadPrices() {
+      var map = {};
+      try { map = JSON.parse(safeGetStorage(PRICE_KEY) || '{}'); } catch (e) {}
+      CATEGORIES.forEach(function(c){ c.list.forEach(function(p){
+        p._def = {};
+        PRICE_FIELDS.forEach(function(f){ if (typeof p[f] === 'number') p._def[f] = p[f]; });
+        var o = map[productKey(c.type, p.name)];
+        if (o) PRICE_FIELDS.forEach(function(f){ if (typeof p[f] === 'number' && typeof o[f] === 'number' && o[f] > 0) p[f] = o[f]; });
+      }); });
+    }
+    function savePrices() {
+      var map = {};
+      CATEGORIES.forEach(function(c){ c.list.forEach(function(p){
+        var o = {}, any = false;
+        PRICE_FIELDS.forEach(function(f){ if (typeof p[f] === 'number' && p[f] !== p._def[f]) { o[f] = p[f]; any = true; } });
+        if (any) map[productKey(c.type, p.name)] = o;
+      }); });
+      safeSetStorage(PRICE_KEY, JSON.stringify(map));
+    }
+    function parseNum(s) {
+      var v = parseFloat(String(s).replace(/\s|€/g, '').replace(',', '.'));
+      return isNaN(v) ? NaN : v;
+    }
+    function fmtInput(f, v) { return f === 'defaultGrams' ? String(v) : formatEuro(v); }
+
+    // ---------- Einstellungen (Abholzeit) ----------
+    function loadSettings() { try { return JSON.parse(safeGetStorage(SETTINGS_KEY) || '{}'); } catch (e) { return {}; } }
+    function getPickup() { var s = loadSettings().pickup; return (s && s.trim()) ? s.trim() : DEFAULT_PICKUP; }
+    function pickupSentence() { return 'Sie kann ' + getPickup() + ' abgeholt werden.'; }
+
     function setAllActive(on) {
       CATEGORIES.forEach(function(c){ c.list.forEach(function(p){ p.active = on; }); });
       saveAvailability(); renderAll();
@@ -438,8 +495,9 @@
         (isWeight(p) ? '<div class="gram-wrap"><input type="number" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" min="0" step="10" placeholder="0" aria-label="Gramm" /><span>g</span></div>' : '') +
         '<div class="bottom"><button type="button" class="minus" aria-label="Eins weniger">−</button><span class="price">' + priceTxt + '</span><span class="sum"></span></div>';
       t.querySelector('.name').textContent = hyphenate(p.name);
+      if (editMode) addPriceEditor(t, p);
 
-      var input = t.querySelector('input');
+      var input = t.querySelector('.gram-wrap input');
       if (input) {
         input.addEventListener('input', function(){
           var v = parseInt(input.value, 10);
@@ -464,6 +522,39 @@
       return t;
     }
 
+    function addPriceEditor(t, p) {
+      var box = document.createElement('div'); box.className = 'price-edit';
+      var fields = isWeight(p) ? [['pricePerKg', '€/kg', 'decimal'], ['defaultGrams', 'g/Port.', 'numeric']] : [['price', '€', 'decimal']];
+      fields.forEach(function(fd){
+        var f = fd[0];
+        var lab = document.createElement('label');
+        var inp = document.createElement('input');
+        inp.type = 'text'; inp.setAttribute('inputmode', fd[2]); inp.setAttribute('enterkeyhint', 'done');
+        inp.setAttribute('aria-label', p.name + ' ' + fd[1]);
+        inp.value = fmtInput(f, p[f]);
+        inp.classList.toggle('changed', p[f] !== p._def[f]);
+        var sp = document.createElement('span'); sp.textContent = fd[1];
+        lab.appendChild(inp); lab.appendChild(sp); box.appendChild(lab);
+        // Eingaben dürfen die Kachel nicht ein-/ausblenden
+        ['pointerdown', 'pointerup', 'click'].forEach(function(ev){ inp.addEventListener(ev, function(e){ e.stopPropagation(); }); });
+        lab.addEventListener('pointerdown', function(e){ e.stopPropagation(); });
+        lab.addEventListener('pointerup', function(e){ e.stopPropagation(); });
+        inp.addEventListener('focus', function(){ try { inp.select(); } catch (e) {} });
+        inp.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
+        inp.addEventListener('change', function(){
+          var v = parseNum(inp.value);
+          if (f === 'defaultGrams') v = Math.round(v);
+          if (isNaN(v) || v <= 0) { inp.value = fmtInput(f, p[f]); showNotice('Ungültige Zahl'); return; }
+          p[f] = Math.round(v * 100) / 100;
+          inp.value = fmtInput(f, p[f]);
+          inp.classList.toggle('changed', p[f] !== p._def[f]);
+          savePrices(); updateTotal();
+          showNotice(p.name + ': ' + (f === 'defaultGrams' ? 'Portion ' + p[f] + ' g' : formatEuro(p[f]) + ' ' + fd[1]) + ' gespeichert');
+        });
+      });
+      t.appendChild(box);
+    }
+
     function paint(t, p, k, fromInput) {
       var v = state[k] || 0;
       t.classList.toggle('has', v > 0);
@@ -471,7 +562,7 @@
         ? (v >= 1000 ? formatEuro(v / 1000).replace(',00', '') + ' kg' : v + ' g')
         : v;
       t.querySelector('.sum').textContent = v > 0 ? formatEuro(lineSum(p, v)) + ' €' : '';
-      var input = t.querySelector('input');
+      var input = t.querySelector('.gram-wrap input');
       if (input && !fromInput) input.value = v > 0 ? v : '';
     }
 
@@ -568,12 +659,12 @@
       var cname = getCustomerName();
       lines.push(cname ? 'Hallo ' + cname + ',' : 'Hallo,');
       lines.push('danke für deine Bestellung!');
-      lines.push('Sie kann ab 15:00 Uhr jederzeit abgeholt werden.');
+      lines.push(pickupSentence());
       lines.push('');
       lines.push('Das ist drin:');
       sale.items.forEach(function(it){ lines.push(it.qty + 'x ' + it.name + (it.weight ? ' (' + it.unit + ')' : '')); });
       lines.push('');
-      lines.push('Gesamt: ' + formatEuro(sale.total) + '€');
+      lines.push('Gesamt: ' + formatEuro(sale.total) + ' €');
       lines.push('');
       lines.push('Bezahlen per Handy:');
       lines.push('https://bit.ly/paygemüse');
@@ -728,9 +819,9 @@
         });
       });
       var lines = ['Tagesabschluss Abhof Grafinger', todayKey().split('-').reverse().join('.'), '',
-        'Kisten: ' + sales.length, 'Umsatz gesamt: ' + formatEuro(total) + '€', '', 'Kisten pro Kunde:'];
+        'Kisten: ' + sales.length, 'Umsatz gesamt: ' + formatEuro(total) + ' €', '', 'Kisten pro Kunde:'];
       sales.forEach(function(s, i){
-        lines.push('- ' + (s.customer ? s.customer : 'Kiste ' + (i + 1)) + ': ' + formatEuro(s.total || 0) + '€');
+        lines.push('- ' + (s.customer ? s.customer : 'Kiste ' + (i + 1)) + ': ' + formatEuro(s.total || 0) + ' €');
       });
       lines.push('', 'Verkaufte Produkte:');
       Object.keys(productMap).sort(function(a,b){ return a.localeCompare(b); }).forEach(function(n){
@@ -805,6 +896,32 @@
       this.textContent = editMode ? 'Fertig' : 'Angebot';
       renderAll();
     });
+    // Abholzeit
+    var pickupInput = $('pickupInput');
+    function showPickupPreview() { $('pickupPreview').textContent = 'In der Nachricht: „' + pickupSentence() + '“'; }
+    pickupInput.addEventListener('input', function(){
+      var s = loadSettings(); s.pickup = pickupInput.value; safeSetStorage(SETTINGS_KEY, JSON.stringify(s));
+      showPickupPreview();
+    });
+    pickupInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); pickupInput.blur(); } });
+    $('resetPricesBtn').addEventListener('click', function(){
+      var btn = this;
+      // Zweistufig, weil es alle geänderten Preise verwirft
+      if (!btn._armed) {
+        btn._armed = true; btn.textContent = 'Wirklich?';
+        setTimeout(function(){ btn._armed = false; btn.textContent = 'Preise Standard'; }, 3000);
+        return;
+      }
+      btn._armed = false; btn.textContent = 'Preise Standard';
+      var before = safeGetStorage(PRICE_KEY);
+      CATEGORIES.forEach(function(c){ c.list.forEach(function(p){
+        PRICE_FIELDS.forEach(function(f){ if (typeof p._def[f] === 'number') p[f] = p._def[f]; });
+      }); });
+      savePrices(); renderAll();
+      showNotice('Standardpreise wiederhergestellt', 'Rückgängig', function(){
+        safeSetStorage(PRICE_KEY, before || '{}'); loadPrices(); renderAll();
+      });
+    });
     $('showAllBtn').addEventListener('click', function(){ setAllActive(true); });
     $('hideAllBtn').addEventListener('click', function(){ setAllActive(false); });
     $('checkBtn').addEventListener('click', function(){
@@ -857,6 +974,9 @@
     $('closeManualCopyBtn').addEventListener('click', function(){ manualCopyBox.style.display = 'none'; });
 
     loadAvailability();
+    loadPrices();
+    pickupInput.value = loadSettings().pickup || '';
+    showPickupPreview();
     renderAll();
   </script>
 </body>
