@@ -354,6 +354,10 @@
 
     // Gleiche Speicher wie bisher: Angebot und Tagesabschluss bleiben erhalten
     var STORAGE_KEY = 'abhof-grafinger-bestellrechner-angebot-v1';
+    // Stripe-Zahlungslink "Frisches Gemüse vom Abhof Grafinger" (Kunde wählt Betrag, min. 1 €).
+    // Der Betrag wird per ?prefilled_amount=<Cent> automatisch vorbefüllt.
+    var STRIPE_PAY_LINK = 'https://buy.stripe.com/aFa9AT40J4SvfdTf7R1B603';
+
     var SALES_KEY = 'abhof-grafinger-tagesverkaeufe-v1';
     var PRICE_KEY = 'abhof-grafinger-preise-v1';          // geänderte Preise (nur Abweichungen vom Standard)
     var SETTINGS_KEY = 'abhof-grafinger-einstellungen-v1'; // z. B. Abholzeit
@@ -651,6 +655,14 @@
       $('checkTotal').textContent = formatEuro(sale.total) + ' €';
     }
 
+    // ---------- Stripe-Link mit Betrag ----------
+    // prefilled_amount = Betrag in Cent (Stripe-Minimum 1 €). Bewusst kurz gehalten für WhatsApp.
+    function buildPayLink(total) {
+      var cents = Math.round(total * 100);
+      if (cents < 100) return STRIPE_PAY_LINK;
+      return STRIPE_PAY_LINK + '?prefilled_amount=' + cents;
+    }
+
     // ---------- Kundennachricht ----------
     function buildInvoiceText() {
       var sale = getCurrentSaleItems();
@@ -667,7 +679,7 @@
       lines.push('Gesamt: ' + formatEuro(sale.total) + ' €');
       lines.push('');
       lines.push('Bezahlen per Handy:');
-      lines.push('https://bit.ly/paygemüse');
+      lines.push(buildPayLink(sale.total));
       lines.push('oder bar bei Abholung.');
       lines.push('');
       lines.push('Liebe Grüße vom Abhof Grafinger');
