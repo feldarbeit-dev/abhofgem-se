@@ -354,9 +354,10 @@
 
     // Gleiche Speicher wie bisher: Angebot und Tagesabschluss bleiben erhalten
     var STORAGE_KEY = 'abhof-grafinger-bestellrechner-angebot-v1';
-    // Stripe-Zahlungslink "Frisches Gemüse vom Abhof Grafinger" (Kunde wählt Betrag, min. 1 €).
-    // Der Betrag wird per ?prefilled_amount=<Cent> automatisch vorbefüllt.
-    var STRIPE_PAY_LINK = 'https://buy.stripe.com/aFa9AT40J4SvfdTf7R1B603';
+    // Kurzer Bezahl-Link über die eigene Wix-Seite „zahlen“. Die Seite leitet mit dem Betrag
+    // (?b=<Cent>) zum Stripe-Zahlungslink weiter – siehe wix-zahlen-seite.js.
+    // Domain/Seitenname bei Bedarf hier ändern.
+    var PAY_LINK = 'https://abhofgrafinger.at/zahlen';
 
     var SALES_KEY = 'abhof-grafinger-tagesverkaeufe-v1';
     var PRICE_KEY = 'abhof-grafinger-preise-v1';          // geänderte Preise (nur Abweichungen vom Standard)
@@ -655,12 +656,12 @@
       $('checkTotal').textContent = formatEuro(sale.total) + ' €';
     }
 
-    // ---------- Stripe-Link mit Betrag ----------
-    // prefilled_amount = Betrag in Cent (Stripe-Minimum 1 €). Bewusst kurz gehalten für WhatsApp.
+    // ---------- Bezahl-Link mit Betrag ----------
+    // b = Betrag in Cent (Stripe-Minimum 1 €; darunter ohne Betrag, Kunde gibt ihn selbst ein).
     function buildPayLink(total) {
       var cents = Math.round(total * 100);
-      if (cents < 100) return STRIPE_PAY_LINK;
-      return STRIPE_PAY_LINK + '?prefilled_amount=' + cents;
+      if (cents < 100) return PAY_LINK;
+      return PAY_LINK + '?b=' + cents;
     }
 
     // ---------- Kundennachricht ----------
